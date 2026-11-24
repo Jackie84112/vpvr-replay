@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>分段 VPVR 回放</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#1f2328;--ink2:#57606a;--muted:#8c959f;--line:#e5e7eb;--accent:#c2410c;--blue:#2563eb;--bg:#fff;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Noto Sans TC",sans-serif;color:var(--ink);background:#f6f7f9}
+  .shell{display:flex;justify-content:center;align-items:flex-start;gap:16px;padding:18px}
+  .col{flex:1 1 auto;min-width:0;max-width:1180px;display:flex;flex-direction:column;gap:16px}
+  .wrap{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  header{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;background:#fbf1ec;border-top:3px solid var(--accent)}
+  .tk{font-size:30px;font-weight:700;color:var(--accent);margin-right:14px}
+  .nm{font-size:19px;font-weight:700}
+  .sub{font-size:13px;color:var(--ink2);margin-top:2px}
+  .px{text-align:right}.px b{font-size:26px}.chg{font-size:14px;font-weight:700}
+  .up{color:#d1242f}.dn{color:#1a7f37}
+  .bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 22px 4px}
+  .lbl{font-size:13px;color:var(--ink2);margin-right:6px}
+  .grp{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .grp.vp{overflow:visible}
+  .tab{position:relative;display:inline-flex;align-items:center;font-size:14px;border-right:1px solid var(--line);background:#fff}
+  .tab:first-child{border-radius:999px 0 0 999px}.tab:last-child{border-right:0;border-radius:0 999px 999px 0}
+  .tab .nm2{padding:6px 4px 6px 16px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+  .tab .sw{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .tab .win{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:#eef1f5;color:var(--ink2);font-weight:500}
+  .tab .car{padding:6px 12px 6px 6px;cursor:pointer;display:inline-flex;align-items:center;color:var(--muted)}
+  .tab .car svg{width:10px;height:10px;transition:transform .15s}
+  .tab.open .car svg{transform:rotate(180deg)}
+  .tab.on{background:#1f2328;color:#fff}
+  .tab.on .win{background:rgba(255,255,255,.16);color:#fff}
+  .tab.on .car{color:#cfd4da}
+  .tab.cur{box-shadow:inset 0 -3px 0 #60a5fa}
+  .menu{position:absolute;top:calc(100% + 6px);left:0;min-width:200px;white-space:nowrap;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px;display:none;z-index:10;color:var(--ink)}
+  .tab.open .menu{display:block}
+  .menu div{padding:7px 10px;border-radius:6px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:16px}
+  .menu div:hover{background:#f3f4f6}
+  .menu div.sel{font-weight:700}
+  .menu div.sel::after{content:"✓";color:var(--blue)}
+  .menu small{color:var(--muted);font-weight:400}
+  .menu .hd{font-weight:700;justify-content:flex-start;gap:8px}
+  .menu .vprow{position:relative}
+  .menu .vprow .cw{margin-left:auto}
+  .menu .vprow .arr{color:var(--muted);font-weight:400}
+  .menu .fly{position:absolute;left:calc(100% + 2px);top:-6px;min-width:130px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px;display:none;font-weight:400}
+  .menu .fly::before{content:"";position:absolute;left:-10px;top:0;width:10px;height:100%}
+  .menu .vprow:hover .fly{display:block}
+  .menu .vprow:hover{background:#f3f4f6}
+  .menu .off{color:var(--muted)}
+  .menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+  .menu .box{width:14px;height:14px;border:1.5px solid #c9ced4;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex:none}
+  .menu .box.on{background:var(--blue);border-color:var(--blue)}
+  .menu div.sel::after{content:"●";font-size:8px}
+  .legend{display:inline-flex;gap:12px;margin-left:10px}
+  .legend i{width:12px;height:3px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
+  .chip{padding:6px 11px;font-size:13px;cursor:pointer;border:0;border-right:1px solid var(--line);background:#fff;font-family:inherit;display:inline-flex;align-items:center;gap:6px;color:var(--ink2)}
+  .chip:last-child{border-right:0}
+  .chip i{width:12px;height:3px;border-radius:2px;display:inline-block}
+  .chip.on{color:var(--ink);font-weight:500;background:#f3f4f6}
+  .chip.dis{opacity:.4;cursor:default}
+  .chip:not(.on) i{opacity:.3}
+  .chip.dark.on{background:#1f2328;color:#fff}
+  .info{padding:8px 22px 0;font-size:13px;color:var(--ink2)}
+  .info b{color:var(--ink)}
+  #chart,.chartbox{position:relative;padding:6px 10px 0 10px}
+  svg{display:block;width:100%}
+  .tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);display:none;white-space:nowrap;line-height:1.6}
+  .notes{padding:4px 22px 16px;font-size:12px;color:var(--muted);line-height:1.7}
+  .evbtn{display:inline-flex;align-items:center;gap:6px}
+  .evbtn i{width:9px;height:9px;border-radius:50%;border:2px solid #d1242f;display:inline-block}
+  #evp{display:none;flex:0 0 340px;position:sticky;top:18px;max-height:calc(100vh - 36px);background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:22px;overflow:auto;box-sizing:border-box}
+  #evp.show{display:block;position:sticky}
+  #evp .x{position:absolute;top:12px;right:14px;border:0;background:none;font-size:20px;color:var(--muted);cursor:pointer}
+  #evp .d{font-size:13px;color:var(--ink2)}
+  #evp h3{margin:6px 0 10px;font-size:19px}
+  #evp .tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;margin-bottom:12px}
+  #evp .tag.up{background:#fde8e8;color:#d1242f}#evp .tag.dn{background:#e6f4ea;color:#1a7f37}
+  #evp p{font-size:14px;line-height:1.75;margin:0 0 10px}
+  #evp .src{font-size:12px;color:var(--muted)}
+  #evp .nav{display:flex;justify-content:space-between;margin-top:18px}
+  .pages{display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px;align-self:flex-start}
+  .pages button{border:0;background:none;font-family:inherit;font-size:15px;font-weight:500;padding:7px 22px;border-radius:7px;cursor:pointer;color:var(--ink2)}
+  .pages button.on{background:#1f2328;color:#fff}
+  .page{display:flex;flex-direction:column;gap:16px}
+  .page.hide{display:none}
+  #evp .nav button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-family:inherit;font-size:12px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="col" id="col">
+<div class="pages" id="pages"><button data-p="etf" class="on">ETF</button><button data-p="stock">個股</button></div>
+<div class="page" id="pg-etf">
+<div class="wrap">
+  <header>
+    <div style="display:flex;align-items:center">
+      <span class="tk">SOXX</span>
+      <div><div class="nm">iShares Semiconductor ETF</div></div>
+    </div>
+    <div class="px"><b id="last"></b><div class="chg" id="chg"></div></div>
+  </header>
+
+  <div class="bar">
+    <span><span class="lbl">階段</span><span class="grp vp" id="tabs"></span></span>
+    <span><span class="lbl">均線</span><span class="grp" id="mas"></span></span>
+    <span><span class="lbl">事件</span><span class="grp"><button class="chip evbtn" id="evToggle"><i></i>標註事件</button></span></span>
+    <span><span class="lbl">時間範圍</span><span class="grp" id="ranges"></span></span>
+  </div>
+  <div class="info" id="info"></div>
+  <div id="chart"><svg id="svg"></svg><div class="tip" id="tip"></div></div>
+</div>
+</div>
+<div class="page hide" id="pg-stock"></div>
+</div>
+  <aside id="evp"><button class="x" id="evClose">×</button><div id="evBody"></div></aside>
+</div>
+<script>
+const ALL = /*DATA*/;
+let DATA = ALL;
+const WIN = {wave:'本次', '6m':'半年', '1y':'一年'};
+const MAS = [['ma20','月線20','#f59e0b'],['ma60','季線60','#7c3aed'],['ma120','半年線120','#0d9488'],['ma240','年線240','#db2777']];
+const RANGES = [['6m','6 個月','2026-05-01'],['1y','1 年','2025-11-24']];
+const SHADE = ['#64748b','#ef4444','#f59e0b','#22c55e','#3b82f6'];
+const N = DATA.nodes.length;
+// 階段起訖：下跌從 6/22 高點起，其餘從上一段結束日起
+let PH = DATA.nodes.map((n,i)=>({...n, start: i? DATA.nodes[i-1].end : DATA.high}));
+// 第五段「後續」：10/6 之後只有股價，沒有 VPVR／均線設定（沿用反彈2）
+PH.push({key:'後續', start:DATA.end, end:DATA.series[DATA.series.length-1].d, extra:true});
+// open = 開啟到第幾段（連續回放，0 = 全關）；每段各自的 VPVR / 均線設定
+const mkState=PH=>({open:1, ev:false, vp:PH.map(()=>'wave'), ma:PH.map(()=>false), maShow:new Set(MAS.map(m=>m[0])), sp:{y10:true,hy:true,ig:true}, fold:{oil:false,rates:false,margin:false}, range:'6m'});
+let st = mkState(PH);
+
+let S = DATA.series;
+// 頁首：顯示回放終點那天的收盤，不透露之後的價格
+// 頁首：最後開啟階段的股價區間（上一段結束日收盤 – 本段結束日收盤），小字寫日期範圍與漲跌幅
+let LASTEL=document.getElementById('last'), CHGEL=document.getElementById('chg');
+function setHeader(ph){
+  const md=d=>d.slice(5).replace('-','/'), last=LASTEL, chg=CHGEL;
+  if(!ph){ const h=S.find(p=>p.d===DATA.high); last.textContent=h.c.toFixed(2); chg.textContent=`${md(h.d)} 收盤高點`; chg.className='chg'; return; }
+  const a = S.find(p=>p.d===ph.start), b=S.find(p=>p.d===ph.end);   // 起點＝上一段結束日收盤（下跌段＝6/22）
+  const pct=(b.c/a.c-1)*100;
+  last.textContent=`${a.c.toFixed(2)} – ${b.c.toFixed(2)}`;
+  chg.textContent=`${ph.key}｜${md(a.d)} – ${md(b.d)}｜${pct>=0?'+':''}${pct.toFixed(2)}%`;
+  chg.className='chg '+(pct>=0?'up':'dn');
+}
+
+const evp=document.getElementById('evp');
+function closeEv(){ evp.classList.remove('show'); document.body.classList.remove('evopen'); evSel=null; }
+document.getElementById('evClose').onclick=()=>{closeEv();render();};
+function showEv(k){
+  evSel=k; const e=EVENTS[k], md=e.d.slice(5).replace('-','/');
+  const g0=leadC().geo, vis=EVENTS.map((o,i)=>i).filter(i=>EVENTS[i].d<=(g0?g0.endD:'9999'));
+  const pi=vis.indexOf(k);
+  document.getElementById('evBody').innerHTML=
+    `<div class="d">${e.d}</div><h3>${e.t}</h3><span class="tag ${e.s==='up'?'up':'dn'}">${e.s==='up'?'利好':'利空'}</span>`+
+    `<p>${e.x}</p><div class="src">出處：${e.src}</div>`+
+    `<div class="nav"><button ${pi>0?'':'disabled'} data-go="${vis[pi-1]}">‹ 上一則</button><button ${pi<vis.length-1?'':'disabled'} data-go="${vis[pi+1]}">下一則 ›</button></div>`;
+  document.querySelectorAll('#evBody [data-go]').forEach(b=>b.onclick=()=>{showEv(+b.dataset.go);render();});
+  evp.classList.add('show'); document.body.classList.add('evopen');
+}
+
+// ---- controls：每張圖各自一排（C.st 為該圖狀態）
+let tabs, mas, ranges, info, evToggle;
+function buildBar(C){
+const st=C.st, PH=C.PH, tabs=C.tabs, mas=C.mas, ranges=C.ranges;
+const closeMenus=()=>[...tabs.children].forEach(t=>t.classList.remove('open'));
+PH.forEach((n,i)=>{
+  const t=document.createElement('span'); t.className='tab';
+  if(n.extra){ t.innerHTML=`<span class="nm2" style="padding-right:16px"><i class="sw" style="background:${SHADE[i]}"></i>${n.key}</span>`;
+    t.querySelector('.nm2').onclick=()=>{closeMenus();st.open=(i<st.open)?i:i+1;render();}; tabs.appendChild(t); return; }
+  t.innerHTML=`<span class="nm2"><i class="sw" style="background:${SHADE[i]}"></i>${n.key}<span class="win"></span></span>`+
+    `<span class="car"><svg viewBox="0 0 10 10"><path d="M1.5 3.5 5 7l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>`+
+    `<span class="menu">`+
+      `<div class="hd vprow" data-act="vp"><span class="box"></span>VPVR<small class="cw"></small><span class="arr">›</span>`+
+        `<span class="fly">${Object.entries(WIN).map(([k,v])=>`<div data-w="${k}">${v}<small>${k==='wave'?'6/22 起':''}</small></div>`).join('')}</span></div>`+
+      `<hr><div class="hd" data-act="ma"><span class="box"></span>均線<small>月／季／半年／年</small></div>`+
+    `</span>`;
+  // 點名稱：未開→開到這段（含前面）；已開→關掉這段與後面
+  t.querySelector('.nm2').onclick=()=>{closeMenus();st.open = (i<st.open)? i : i+1;render();};
+  t.querySelector('.car').onclick=e=>{e.stopPropagation();const o=t.classList.contains('open');closeMenus();if(!o)t.classList.add('open');};
+  t.querySelector('[data-act=vp]').onclick=e=>{e.stopPropagation();st.vp[i]=st.vp[i]?null:'wave';render();};
+  t.querySelector('[data-act=ma]').onclick=e=>{e.stopPropagation();st.ma[i]=!st.ma[i];if(st.ma[i])st.maShow=new Set(MAS.map(m=>m[0]));render();};
+  t.querySelectorAll('[data-w]').forEach(d=>d.onclick=e=>{e.stopPropagation();st.vp[i]=d.dataset.w;render();});
+  tabs.appendChild(t);
+});
+document.addEventListener('click',e=>{ if(!tabs.contains(e.target)) closeMenus(); });
+MAS.forEach(([k,l,c])=>{const b=document.createElement('button');b.className='chip';b.dataset.k=k;b.innerHTML=`<i style="background:${c}"></i>${l}`;
+  b.onclick=()=>{ if(b.classList.contains('dis'))return; st.maShow.has(k)?st.maShow.delete(k):st.maShow.add(k); render(); };
+  mas.appendChild(b);});
+if(C.ev) C.ev.onclick=()=>{st.ev=!st.ev; if(!st.ev) closeEv(); render();};
+RANGES.forEach(([k,l])=>{const b=document.createElement('button');b.className='chip dark';b.textContent=l;b.dataset.k=k;
+  b.onclick=()=>{st.range=k;render();};ranges.appendChild(b);});
+}
+
+// ---- chart
+let svg=document.getElementById('svg'), tip=document.getElementById('tip'), box=document.getElementById('chart');
+const NS='http://www.w3.org/2000/svg';
+const el=(tag,a,p)=>{const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e;};
+const fmtD=d=>d.slice(5).replace('-','/');
+let geo=null;
+// 回補水位的高低點：6/22 收盤高點、高點到下跌段終點間的最低收盤
+// 每檔各自算：在下跌段（6/22 → 7/29）內找最高收盤（SOXX 即 6/22），低點＝該高點之後到下跌段終點的最低收盤
+const fibOf=(S,PH)=>{ const hi=S.filter(p=>p.d>=PH[0].start&&p.d<=PH[0].end).reduce((a,b)=>b.c>a.c?b:a);
+  return [hi, S.filter(p=>p.d>=hi.d&&p.d<=PH[0].end).reduce((a,b)=>b.c<a.c?b:a)]; };
+let [FHI,FLO]=fibOf(S,PH);
+const mkPH=D=>{ const ph=D.nodes.map((n,i)=>({...n, start: i? D.nodes[i-1].end : D.high}));
+  ph.push({key:'後續', start:D.end, end:D.series[D.series.length-1].d, extra:true}); return ph; };
+// 每檔標題顏色（主色, 標題底色）
+const COLORS={SOXX:['#c2410c','#fbf1ec'],'0050':['#1d4ed8','#edf2fd'],QQQ:['#7c3aed','#f4effd'],SPY:['#0f766e','#e8f5f2'],
+  AMD:['#be123c','#fdecf0'],TSM:['#b45309','#fdf3e6'],'2454':['#0369a1','#e7f3fa']};
+const paint=(card,code)=>{ const [ac,bg]=COLORS[code]||['#57606a','#f3f4f6']; card.style.setProperty('--accent',ac); card.querySelector('header').style.background=bg; };
+const barHTML=ev=>`<div class="bar"><span><span class="lbl">階段</span><span class="grp vp tabs"></span></span><span><span class="lbl">均線</span><span class="grp mas"></span></span>`+
+  (ev?`<span><span class="lbl">事件</span><span class="grp"><button class="chip evbtn"><i></i>標註事件</button></span></span>`:'')+
+  `<span><span class="lbl">時間範圍</span><span class="grp ranges"></span></span></div><div class="info"></div>`;
+// 下方 ETF 卡片
+const CHARTS=[{page:'etf',lead:true,macro:true,D:ALL,PH,S,FHI,FLO,svg,tip,box,last:LASTEL,chg:CHGEL,geo:null,st,
+  tabs:document.getElementById('tabs'),mas:document.getElementById('mas'),ranges:document.getElementById('ranges'),info:document.getElementById('info'),ev:document.getElementById('evToggle')}];
+paint(document.querySelector('#pg-etf .wrap'),ALL.ticker);
+[...(ALL.extras||[]).map(D=>['etf',D]), ...(ALL.stocks||[]).map((D,i)=>['stock',D,i===0])].forEach(([pg,D,lead])=>{
+  const card=document.createElement('div'); card.className='wrap';
+  card.innerHTML=`<header><div style="display:flex;align-items:center"><span class="tk">${D.ticker}</span><div><div class="nm">${D.name}</div></div></div>`+
+    `<div class="px"><b></b><div class="chg"></div></div></header>`+barHTML(!!lead)+`<div class="chartbox"><svg></svg><div class="tip"></div></div>`;
+  paint(card,D.ticker);
+  document.getElementById('pg-'+pg).appendChild(card);
+  const ph=mkPH(D), [hi,lo]=fibOf(D.series,ph);
+  CHARTS.push({page:pg,lead:!!lead,macro:false,D,PH:ph,S:D.series,FHI:hi,FLO:lo,svg:card.querySelector('svg'),tip:card.querySelector('.tip'),box:card.querySelector('.chartbox'),
+    last:card.querySelector('.px b'),chg:card.querySelector('.chg'),geo:null,st:mkState(ph),
+    tabs:card.querySelector('.tabs'),mas:card.querySelector('.mas'),ranges:card.querySelector('.ranges'),info:card.querySelector('.info'),ev:card.querySelector('.evbtn')});
+});
+CHARTS.forEach(buildBar);
+let PAGE='etf';
+const leadC=()=>CHARTS.find(C=>C.page===PAGE&&C.lead);
+document.querySelectorAll('#pages button').forEach(b=>b.onclick=()=>{
+  if(PAGE===b.dataset.p) return; PAGE=b.dataset.p; closeEv();
+  document.querySelectorAll('#pages button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hide',x.id!=='pg-'+PAGE));
+  render(); });
+function use(C){ st=C.st; tabs=C.tabs; mas=C.mas; ranges=C.ranges; info=C.info; evToggle=C.ev; DATA=C.D; PH=C.PH; S=C.S; FHI=C.FHI; FLO=C.FLO; svg=C.svg; tip=C.tip; box=C.box; LASTEL=C.last; CHGEL=C.chg; geo=C.geo; }
+// 事件（手動維護）：d＝日期、s＝up 利好（紅）／dn 利空（綠）、t＝圈下短標（5 字內）、x＝詳細說明、src＝出處
+const EVENTS=[
+  {d:'2026-07-08',s:'dn',t:'油價急漲',x:'美伊和平框架在 7/8 破裂，油價從 70 多美元重新急漲。',src:'2026 world oil market chronology（Wikipedia）'},
+  {d:'2026-07-09',s:'dn',t:'ORCL降評',x:'S&P 把 ORCL 從 BBB 降到 BBB-（投資級最低一級），理由是 AI 基建成本低估、capex 上調到 900–950 億美元；再降一級就跌出投資級。',src:'S&P；研究筆記 ORCL 信用風險'},
+  {d:'2026-07-14',s:'up',t:'CPI降溫',x:'6 月 CPI 年增 3.5%（預期 3.8%，5 月 4.2%），月減 0.4%；汽油 −9.7%。核心 CPI 月增 0%、年增 2.6%。7 月升息預期降溫。',src:'BLS；Fox Business 7/14'},
+  {d:'2026-07-16',s:'up',t:'台積法說',x:'台積電 2Q26 營收 402 億美元（年增 33.7%），毛利率 67.7%。全年營收成長由 30% 上修到略高於 40%，capex 上調到 600–640 億美元；3Q 營收指引 446–458 億美元。',src:'TSMC 2Q26 法說會（7/16）'},
+  {d:'2026-07-28',s:'dn',t:'CDS新高',x:'NVDA、Alphabet 等 CSP 與晶片設計商 CDS 創紀錄高點，NVDA 為 2025/11 以來最高；91 檔 CSP 債券中 78 檔殖利率高於發行時。AMZN 7 月 250 億美元發債只有 1.6 倍認購，新發溢價 12–22bp。',src:'雙周報 0728；研究筆記 ORCL 信用風險'},
+  {d:'2026-07-29',s:'dn',t:'FOMC分歧',x:'FOMC 維持 3.50–3.75% 不變，但 9 比 3，Hammack、Kashkari、Logan 主張升息一碼。當天 SOXX 收 155.00，是下跌段最低點（總經網站標為「去槓桿」）。',src:'Fed 7/29 聲明；Semafor'},
+  {d:'2026-08-07',s:'up',t:'非農轉負',x:'7 月非農 −2.3 萬；6 月下修為 +2.0 萬、5 月為 +6.3 萬，兩個月累計下修 10.9 萬。9 月升息預期降溫。',src:'BLS；雙周報 0812'},
+  {d:'2026-08-11',s:'up',t:'AI融資',x:'NVDA 與 Apollo、黑石、貝萊德、博楓、高盛、KKR 共六家機構，承諾提供 5,000 億美元 AI 基建融資。',src:'雙周報 0812'},
+  {d:'2026-08-12',s:'up',t:'CPI降溫',x:'7 月 CPI 年增 3.4%（6 月 3.5%），月增 0.1%；核心 CPI 月增 0.2%（預期 0.3%）、年增 2.5%。',src:'BLS 8/12'},
+  {d:'2026-08-14',s:'dn',t:'輝達縮保',x:'WSJ 報導 NVDA 把 OpenAI 俄亥俄資料中心的融資擔保，從約 2,500 億美元縮減到 1,200 億以下（先只支持第一階段約 5GW）；後續報導最終約 1,050 億。市場解讀為對 AI 需求與融資曝險的疑慮。',src:'WSJ 8/14；Fortune 8/18'},
+  {d:'2026-08-26',s:'up',t:'輝達財報',x:'NVDA 2QFY27 營收 962 億美元（年增 106%），資料中心 890 億；3Q 指引 1,080 億 ±2%（不含中國）。Vera Rubin 進入全面量產、8 月初開始出貨，預估 3Q 佔資料中心營收約 20%。',src:'NVIDIA 8/26 財報'},
+  {d:'2026-09-08',s:'up',t:'Muse推出',x:'Meta 在美國推出個人 AI 代理 Muse。',src:'Saxo；Crypto Briefing'},
+  {d:'2026-09-09',s:'dn',t:'油價破百',x:'美伊衝突升級，布蘭特原油突破每桶 100 美元。',src:'2026 world oil market chronology（Wikipedia）'},
+  {d:'2026-09-16',s:'dn',t:'升息一碼',x:'FOMC 升息一碼到 3.75–4.00%（12 比 0），為 2023 年以來首次；點陣圖中位數顯示 2026 年內再升一次。',src:'Fed 9/16 聲明'},
+  {d:'2026-09-18',s:'dn',t:'ORCL貸款',x:'FT 報導（路透 9/18 轉述）：ORCL Project Jupiter 約 180 億美元資料中心貸款報價跌到 89–91，Santander、Jefferies 等銀行團轉售給機構投資人受阻，被迫多留在帳上。',src:'FT／Reuters 9/18'},
+  {d:'2026-09-21',s:'up',t:'Muse爆紅',x:'Muse 登上美國 App Store 免費榜第一（上線 12 天下載 280 萬次），SOX 當天 +4.3%；ARM +17%、INTC +12%、AMD 近 +10% 並首度站上 1 兆美元市值。市場解讀為 AI 代理推升 CPU 需求。',src:'Saxo 9/22；Crypto Briefing'},
+  {d:'2026-09-22',s:'dn',t:'垃圾債升',x:'垃圾級公司債殖利率從 9/22 起急升到年內最高；AI 相關投資級利差約 115bp，整體投資級約 78bp。',src:'雙周報 1013；研究筆記 ORCL 信用風險'},
+  {d:'2026-09-29',s:'up',t:'輝達回購',x:'NVDA 宣布 1,500 億美元庫藏股回購。',src:'雙周報 0930'},
+  {d:'2026-10-06',s:'dn',t:'OpenAI下調',x:'OpenAI 營收下調（總經網站標註）。10 月 FOMC 紀要提到，9 月到 10 月會議之間「兩家領先 AI 公司營收成長不如投資人預期」。當天 SOXX 收 196.48，是反彈2 的高點。',src:'總經網站 overlay 事件標註；10 月 FOMC 紀要（原始報導出處待補）'},
+];
+let evSel=null;
+const FIB=[[1,'100%'],[0.618,'61.8%'],[0.5,'50.0%'],[0.382,'38.2%'],[0,'0%']];
+
+function render(){ CHARTS.forEach(C=>{ if(C.page!==PAGE) return; use(C); renderOne(C.lead,C.macro); C.geo=geo; }); use(leadC()); }
+function renderOne(LEAD,MAIN){
+  {
+  [...tabs.children].forEach((t,i)=>{
+    t.classList.toggle('on',i<st.open); t.classList.toggle('cur',i===st.open-1);
+    if(PH[i].extra) return;
+    const tags=[]; if(st.vp[i]&&st.vp[i]!=='wave') tags.push(WIN[st.vp[i]]); if(!st.vp[i]) tags.push('無VPVR'); if(st.ma[i]) tags.push('均線');
+    const w=t.querySelector('.win'); w.textContent=tags.join('・'); w.style.display=tags.length?'':'none';
+    [['vp',!!st.vp[i]],['ma',st.ma[i]]].forEach(([a,on])=>{const b=t.querySelector(`[data-act=${a}] .box`);b.classList.toggle('on',on);b.textContent=on?'✓':'';});
+    t.querySelector('.cw').textContent=st.vp[i]?WIN[st.vp[i]]:'';
+    t.querySelectorAll('[data-w]').forEach(d=>{d.classList.toggle('sel',d.dataset.w===st.vp[i]);d.classList.toggle('off',!st.vp[i]);});});
+  [...ranges.children].forEach(b=>b.classList.toggle('on',b.dataset.k===st.range));
+  }
+
+  const cur = st.open? PH[st.open-1] : null;                 // 最後開啟的階段
+  const endD = cur? cur.end : DATA.high;                     // 折線／均線畫到這天
+  const si = cur&&cur.extra? st.open-2 : st.open-1, sc = PH[si];   // 「後續」沿用反彈2 的設定
+  const vp = cur? st.vp[si] : null, showMA = cur? st.ma[si] : false;
+  const P = vp? sc.prof[vp] : null;
+  setHeader(cur);
+  {
+  [...mas.children].forEach(b=>{b.classList.toggle('on',showMA&&st.maShow.has(b.dataset.k));b.classList.toggle('dis',!showMA);});
+  info.innerHTML = cur ?
+    `回放到 <b>${cur.key}</b>（${PH[0].start.slice(5).replace('-','/')} → ${fmtD(cur.end)}）｜VPVR：${P?`<b>${WIN[vp]}</b> ${P.start} ～ ${P.end}`:'未開啟'}`+
+    `｜均線：${showMA?`到 ${sc.end}`:'未開啟（在階段下拉選單勾選）'}`
+    : '尚未開啟任何階段：點上方階段開始回放（會自動連同前面的階段一起開啟）';
+  }
+
+  const from=RANGES.find(r=>r[0]===st.range)[2];
+  const xEnd = cur&&cur.extra? cur.end : DATA.end;            // x 軸到 10/6；開「後續」才延伸
+  const pts=S.filter(p=>p.d>=from&&p.d<=xEnd);
+  const cut=pts.filter(p=>p.d<=endD).length;                 // 折線與均線截止
+  const W=box.clientWidth-20, H=Math.max(420,Math.min(560,W*0.5));
+  const m={l:56,r:100,t:16,b:8};
+  // 下方兩個可折疊副圖：A＝10Y 殖利率 × 信用利差；B＝融資餘額年增 %
+  const Hl=Math.round(H*0.42), Hm=Math.round(H*0.32);
+  const Ho=Math.round(H*0.30);
+  const O0=H+26, OL=O0+12, O1=st.fold.oil? O0+4 : OL+Ho;
+  const A0=O1+30, L0=A0+12, A1=st.fold.rates? A0+4 : L0+Hl;
+  const B0=A1+30, M0=B0+12, B1=st.fold.margin? B0+4 : M0+Hm;
+  const L1=MAIN? B1 : H-m.b, TH=L1+30;   // 其他 ETF 不畫副圖
+  svg.setAttribute('viewBox',`0 0 ${W} ${TH}`); svg.setAttribute('height',TH); svg.innerHTML='';
+  // y 軸：用整段收盤（不隨開關階段跳動）＋開啟時的均線／VPVR 範圍
+  const vals=pts.map(p=>p.c);
+  if(showMA) pts.forEach(p=>MAS.forEach(([k])=>{if(st.maShow.has(k)&&p[k]!=null)vals.push(p[k]);}));
+  if(P){vals.push(P.b0, P.b0+P.v.length*P.bin);}
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  const pad=(hi-lo)*0.03; lo-=pad; hi+=pad;
+  const x=i=>m.l+(W-m.l-m.r)*i/(pts.length-1);
+  const y=v=>m.t+(H-m.t-m.b)*(hi-v)/(hi-lo);
+  const idx=d=>pts.findIndex(p=>p.d>=d);
+  // grid + y ticks
+  const step=[1,2,5,10,20,25,50,100,200].find(s=>(hi-lo)/s<=9)||200;
+  for(let v=Math.ceil(lo/step)*step; v<=hi; v+=step){
+    el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:'#eef0f2'});
+    const t=el('text',{x:m.l-8,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'#8c959f'});t.textContent=v;
+  }
+  // 底色：每個開啟的階段只塗自己那段
+  PH.slice(0,st.open).forEach((ph,i)=>{
+    const i0=idx(ph.start), i1=idx(ph.end); if(i0<0||i1<0) return;
+    el('rect',{x:x(i0),y:m.t,width:Math.max(2,x(i1)-x(i0)),height:H-m.t-m.b,fill:SHADE[i],'fill-opacity':0.13});
+    const t=el('text',{x:(x(i0)+x(i1))/2,y:m.t+14,'text-anchor':'middle','font-size':12,fill:'#57606a','font-weight':500});
+    t.textContent=ph.key;
+  });
+  // VPVR（最後開啟那段）
+  if(P){
+    const maxV=Math.max(...P.v), vw=(W-m.l-m.r)*0.30;
+    P.v.forEach((v,j)=>{
+      const a=P.b0+j*P.bin, b=a+P.bin; if(b<lo||a>hi||!v) return;
+      const yt=y(Math.min(b,hi)), yb=y(Math.max(a,lo));
+      el('rect',{x:m.l,y:yt+0.5,width:vw*v/maxV,height:Math.max(1,yb-yt-1),fill:'#93a8e6','fill-opacity':0.45});
+    });
+  }
+  // 回補水位：6/22 收盤高點 → 7/29 收盤低點，水位 = 低點 + (高點 − 低點) × 比例
+  FIB.forEach(([r,lab])=>{
+    const v=FLO.c+(FHI.c-FLO.c)*r, yy=y(v), edge=(r===0||r===1);
+    el('line',{x1:m.l,x2:W-m.r,y1:yy,y2:yy,stroke:edge?'#c9ced4':'#57606a','stroke-dasharray':edge?'':'5 4','stroke-width':1});
+    const a=el('text',{x:W-m.r+8,y:yy+4,'font-size':11,fill:edge?'#1f2328':'#57606a','font-weight':edge?700:400});a.textContent=lab;
+    const b=el('text',{x:W-m.r+48,y:yy+4,'font-size':11,fill:'#1f2328','font-weight':edge?700:400});b.textContent=v.toFixed(2);
+  });
+  // 均線：四條，從最左邊畫到最後開啟那段的結束日
+  if(showMA){
+    MAS.forEach(([k,,c])=>{ if(!st.maShow.has(k)) return;
+      const d=pts.slice(0,cut).map((p,i)=>p[k]==null?null:`${x(i)},${y(p[k])}`).filter(Boolean);
+      el('polyline',{points:d.join(' '),fill:'none',stroke:c,'stroke-width':1.5,'stroke-opacity':0.9});
+    });
+  }
+  // 收盤折線：6/22 以前一直顯示，之後只到最後開啟那段
+  el('polyline',{points:pts.slice(0,cut).map((p,i)=>`${x(i)},${y(p.c)}`).join(' '),fill:'none',stroke:'#2563eb','stroke-width':2,'stroke-linejoin':'round'});
+  // x ticks：每個月第一個交易日標「YYYY/M」
+  pts.forEach((p,i)=>{
+    if(i>0? pts[i-1].d.slice(0,7)===p.d.slice(0,7) : +p.d.slice(8)>7) return;   // 起點不是月初就不標
+    el('line',{x1:x(i),x2:x(i),y1:L1,y2:L1+4,stroke:'#c9ced4'});
+    const t=el('text',{x:x(i),y:L1+18,'text-anchor':'middle','font-size':11,fill:'#8c959f'});t.textContent=`${p.d.slice(0,4)}/${+p.d.slice(5,7)}`;});
+  el('line',{x1:m.l,x2:W-m.r,y1:H-m.b,y2:H-m.b,stroke:'#d0d7de'});
+  if(MAIN){
+  // ---- 副圖共用：折疊箭頭、階段底色
+  const caret=(key,y0)=>{ const c=el('text',{x:m.l-20,y:y0+1,'font-size':15,fill:'#57606a',style:'cursor:pointer'}); c.textContent=st.fold[key]?'▸':'▾';
+    c.addEventListener('click',()=>{st.fold[key]=!st.fold[key];render();}); return c; };
+  const shade=(y0,h)=>PH.slice(0,st.open).forEach((ph,i)=>{ const i0=idx(ph.start), i1=idx(ph.end); if(i0<0||i1<0) return;
+    el('rect',{x:x(i0),y:y0,width:Math.max(2,x(i1)-x(i0)),height:h,fill:SHADE[i],'fill-opacity':0.13}); });
+  // ---- 副圖 O：WTI 原油價格（美元／桶，右軸；總經網站 rates.json，Yahoo CL=F 近月期貨）
+  caret('oil',O0-10);
+  const ot=el('text',{x:m.l,y:O0-10,'font-size':12,fill:'#57606a',style:'cursor:pointer'});
+  ot.innerHTML='<tspan fill="#3B7DD8">WTI 原油價格</tspan><tspan dx="8" fill="#8c959f" font-size="11">美元／桶，NYMEX WTI 近月期貨</tspan>'+(st.fold.oil?'<tspan dx="8" fill="#8c959f" font-size="11">（已折疊，點標題展開）</tspan>':'');
+  ot.addEventListener('click',()=>{st.fold.oil=!st.fold.oil;render();});
+  if(!st.fold.oil){
+    const ov=pts.map(p=>p.wti).filter(v=>v!=null);
+    let oLo=Math.min(...ov), oHi=Math.max(...ov); const op=(oHi-oLo)*0.08; oLo-=op; oHi+=op;
+    const yO=v=>OL+Ho*(oHi-v)/(oHi-oLo);
+    const os=[5,10,20].find(s=>(oHi-oLo)/s<=5)||20;
+    for(let v=Math.ceil(oLo/os)*os; v<=oHi; v+=os){
+      el('line',{x1:m.l,x2:W-m.r,y1:yO(v),y2:yO(v),stroke:'#eef0f2'});
+      const a=el('text',{x:W-m.r+8,y:yO(v)+4,'font-size':11,fill:'#8c959f'});a.textContent=v;
+    }
+    shade(OL,Ho);
+    el('polyline',{points:pts.slice(0,cut).map((p,i)=>p.wti==null?null:`${x(i)},${yO(p.wti)}`).filter(Boolean).join(' '),fill:'none',stroke:'#3B7DD8','stroke-width':1.6,'stroke-linejoin':'round'});
+    el('line',{x1:m.l,x2:W-m.r,y1:OL+Ho,y2:OL+Ho,stroke:'#e5e7eb'});
+  }
+  // ---- 副圖 A：10Y 殖利率（左軸 %）× 信用利差（右軸 bp）
+  caret('rates',A0-10);
+  const tt=el('text',{x:m.l,y:A0-10,'font-size':12,fill:'#57606a'});
+  tt.innerHTML='<tspan data-fold="rates" style="cursor:pointer"><tspan fill="#D97706">10 年期殖利率 %（左軸）</tspan><tspan dx="4">×</tspan><tspan dx="4">信用利差 bp（右軸）</tspan></tspan>'+
+    (st.fold.rates?'<tspan dx="8" fill="#8c959f" font-size="11">（已折疊，點標題展開）</tspan>':'：'+
+    [['y10','國債殖利率','#D97706'],['hy','垃圾級','#22262B'],['ig','投資級','#1D7A46']].map(([k,l,c],j)=>`<tspan data-sp="${k}" dx="${j?8:0}" fill="${st.sp[k]?c:'#c9ced4'}" font-weight="500" style="cursor:pointer">${st.sp[k]?'●':'○'} ${l}</tspan>`).join('')+
+    '<tspan dx="8" fill="#8c959f" font-size="11">（點選開關）</tspan>');
+  tt.querySelectorAll('[data-sp]').forEach(s=>s.addEventListener('click',()=>{st.sp[s.dataset.sp]=!st.sp[s.dataset.sp];render();}));
+  tt.querySelector('[data-fold]').addEventListener('click',()=>{st.fold.rates=!st.fold.rates;render();});
+  if(!st.fold.rates){
+    const SP=[['hy','垃圾級','#22262B'],['ig','投資級','#1D7A46']].filter(([k])=>st.sp[k]);
+    const yv=pts.map(p=>p.y10).filter(v=>v!=null), sv=pts.flatMap(p=>SP.map(([k])=>p[k])).filter(v=>v!=null);
+    if(!sv.length) sv.push(0,1);
+    let yLo=Math.min(...yv), yHi=Math.max(...yv); const yp=(yHi-yLo)*0.06; yLo-=yp; yHi+=yp;
+    // 右軸線性、只貼合開啟的利差（只開一條時幅度最大）
+    let sLo=Math.min(...sv), sHi=Math.max(...sv); const sp=(sHi-sLo)*0.06||1; sLo-=sp; sHi+=sp;
+    const yL=v=>L0+Hl*(yHi-v)/(yHi-yLo), yS=v=>L0+Hl*(sHi-v)/(sHi-sLo);
+    const ys=[0.05,0.1,0.2,0.25,0.5].find(s=>(yHi-yLo)/s<=6)||0.5;
+    if(st.sp.y10) for(let v=Math.ceil(yLo/ys)*ys; v<=yHi+1e-9; v+=ys){
+      el('line',{x1:m.l,x2:W-m.r,y1:yL(v),y2:yL(v),stroke:'#eef0f2'});
+      const a=el('text',{x:m.l-8,y:yL(v)+4,'text-anchor':'end','font-size':11,fill:'#D97706'});a.textContent=(+v.toFixed(2))+'%';
+    }
+    if(SP.length){ const ss=[1,2,5,10,20,25,50,100].find(s=>(sHi-sLo)/s<=6)||100;
+      for(let v=Math.ceil(sLo/ss)*ss; v<=sHi; v+=ss){ const a=el('text',{x:W-m.r+8,y:yS(v)+4,'font-size':11,fill:'#57606a'});a.textContent=v; } }
+    shade(L0,Hl);
+    const sub=(k,f,c)=>el('polyline',{points:pts.slice(0,cut).map((p,i)=>p[k]==null?null:`${x(i)},${f(p[k])}`).filter(Boolean).join(' '),fill:'none',stroke:c,'stroke-width':1.6,'stroke-linejoin':'round'});
+    SP.forEach(([k,,c])=>sub(k,yS,c)); if(st.sp.y10) sub('y10',yL,'#D97706');
+    el('line',{x1:m.l,x2:W-m.r,y1:L0+Hl,y2:L0+Hl,stroke:'#e5e7eb'});
+  }
+  // ---- 副圖 B：融資餘額年增 %（FINRA 月資料，點在月底；只畫到回放終點）
+  caret('margin',B0-10);
+  const mt=el('text',{x:m.l,y:B0-10,'font-size':12,fill:'#57606a',style:'cursor:pointer'});
+  mt.innerHTML='<tspan fill="#2E7D5B">融資餘額年增 %</tspan><tspan dx="8" fill="#8c959f" font-size="11">FINRA 月資料｜紅虛線＝40%</tspan>'+(st.fold.margin?'<tspan dx="8" fill="#8c959f" font-size="11">（已折疊，點標題展開）</tspan>':'');
+  mt.addEventListener('click',()=>{st.fold.margin=!st.fold.margin;render();});
+  if(!st.fold.margin){
+    const lastIdx=d=>{ let k=-1; for(let i=0;i<pts.length;i++){ if(pts[i].d<=d) k=i; else break; } return k; };
+    const inX=DATA.margin.filter(o=>o.d>=pts[0].d&&o.d<=pts[pts.length-1].d);
+    const vis=inX.filter(o=>o.d<=endD).map(o=>({...o,i:lastIdx(o.d)}));
+    const mv=inX.map(o=>o.yoy).concat([40]);
+    let mLo=Math.min(...mv), mHi=Math.max(...mv); const mp=(mHi-mLo)*0.15; mLo-=mp; mHi+=mp;
+    const yM=v=>M0+Hm*(mHi-v)/(mHi-mLo);
+    const ms=[5,10,20].find(s=>(mHi-mLo)/s<=5)||20;
+    for(let v=Math.ceil(mLo/ms)*ms; v<=mHi; v+=ms){
+      el('line',{x1:m.l,x2:W-m.r,y1:yM(v),y2:yM(v),stroke:'#eef0f2'});
+      const a=el('text',{x:m.l-8,y:yM(v)+4,'text-anchor':'end','font-size':11,fill:'#8c959f'});a.textContent=v+'%';
+    }
+    shade(M0,Hm);
+    if(mLo<=0) el('line',{x1:m.l,x2:W-m.r,y1:yM(0),y2:yM(0),stroke:'#9ca3af'});
+    el('line',{x1:m.l,x2:W-m.r,y1:yM(40),y2:yM(40),stroke:'#E8806F','stroke-dasharray':'2 4','stroke-width':1.5});
+    if(vis.length){
+      el('polyline',{points:vis.map(o=>`${x(o.i)},${yM(o.yoy)}`).join(' '),fill:'none',stroke:'#2E7D5B','stroke-width':1.8,'stroke-linejoin':'round'});
+      vis.forEach(o=>{ el('circle',{cx:x(o.i),cy:yM(o.yoy),r:3,fill:'#2E7D5B'});
+        const l=el('text',{x:x(o.i),y:yM(o.yoy)-8,'text-anchor':'middle','font-size':10,fill:'#57606a'}); l.textContent=`${+o.m.slice(5)}月`; });
+    }
+  }
+  }
+  el('line',{x1:m.l,x2:W-m.r,y1:L1,y2:L1,stroke:'#d0d7de'});
+  // 原點：低點空心圓（下跌段開啟後才出現）
+  const li=pts.findIndex(p=>p.d===FLO.d);
+  if(li>=0&&li<cut) el('circle',{cx:x(li),cy:y(FLO.c),r:5,fill:'#fff',stroke:'#2563eb','stroke-width':2});
+  // 折線終點
+  const n=cut-1;
+  if(n>=0){
+    el('circle',{cx:x(n),cy:y(pts[n].c),r:4,fill:'#2563eb',stroke:'#fff','stroke-width':2});
+    const lt=el('text',{x:x(n)-6,y:y(pts[n].c)<m.t+40? y(pts[n].c)+20 : y(pts[n].c)-12,'text-anchor':'end','font-size':12,fill:'#1f2328','font-weight':500});
+    lt.textContent=`${fmtD(pts[n].d)} 收盤 ${pts[n].c.toFixed(2)}`;
+  }
+  // hover layer
+  const cross=el('line',{y1:m.t,y2:L1,stroke:'#8c959f','stroke-dasharray':'3 3',visibility:'hidden'});
+  const hline=el('line',{x1:m.l,x2:W-m.r,stroke:'#8c959f','stroke-dasharray':'3 3',visibility:'hidden'});
+  const dot=el('circle',{r:4,fill:'#2563eb',stroke:'#fff','stroke-width':2,visibility:'hidden'});
+  [cross,hline,dot].forEach(e=>e.style.pointerEvents='none');
+  if(evToggle) evToggle.classList.toggle('on',st.ev);
+  if(st.ev&&LEAD){
+    const placed=[];
+    EVENTS.forEach((e,k)=>{
+      const i=pts.findIndex(p=>p.d>=e.d); if(i<0||i>=cut||e.d>endD) return;
+      const cx=x(i), cy=y(pts[i].c), col=e.s==='up'?'#d1242f':'#1a7f37', sel=evSel===k;
+      // 短標：先試圈下方，跟已放的標籤重疊就改上方，再不行往下推
+      const w=e.t.length*11+6; let ly=null;
+      for(const cand of [cy+20,cy-12,cy+33,cy-25,cy+46]){
+        if(!placed.some(r=>Math.abs(r.x-cx)<(r.w+w)/2&&Math.abs(r.y-cand)<12)){ly=cand;break;} }
+      if(ly==null) ly=cy+20; placed.push({x:cx,y:ly,w});
+      const g=el('g',{style:'cursor:pointer'});
+      el('circle',{cx,cy,r:7,fill:sel?col:'#fff','fill-opacity':sel?0.25:0.9,stroke:col,'stroke-width':2.2},g);
+      const lb=el('text',{x:cx,y:ly,'text-anchor':'middle','font-size':10.5,fill:col,'font-weight':500,stroke:'#fff','stroke-width':3,'paint-order':'stroke','stroke-linejoin':'round'},g); lb.textContent=e.t;
+      el('circle',{cx,cy,r:13,fill:'transparent'},g);
+      g.addEventListener('click',ev=>{ev.stopPropagation();showEv(k);render();});
+    });
+  }
+  geo={pts,cut,x,y,m,W,H,TH,L0,L1,lo,hi,P,showMA,cross,hline,dot,endD};
+}
+
+function hover(e,MAIN){
+  if(!geo)return; const {pts,cut,x,y,m,W,H,TH,L0,L1,lo,hi,P,showMA,cross,hline,dot,endD}=geo;
+  const r=svg.getBoundingClientRect(), sx=(e.clientX-r.left)*W/r.width, sy=(e.clientY-r.top)*TH/r.height;
+  if(sx<m.l||sx>W-m.r||sy<m.t||sy>L1||cut<1){hide();return;}
+  const inP=sy<=H-m.b;
+  const i=Math.min(cut-1,Math.round((sx-m.l)/(W-m.l-m.r)*(pts.length-1))), p=pts[i];
+  const price=hi-(sy-m.t)/(H-m.t-m.b)*(hi-lo);
+  cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');
+  hline.setAttribute('y1',sy);hline.setAttribute('y2',sy);hline.setAttribute('visibility',inP?'visible':'hidden');
+  dot.setAttribute('cx',x(i));dot.setAttribute('cy',y(p.c));dot.setAttribute('visibility','visible');
+  const maTxt=showMA?MAS.filter(([k])=>st.maShow.has(k)&&p[k]!=null).map(([k,l])=>`${l}：${p[k].toFixed(2)}`).join('<br>'):'';
+  let vpTxt='';
+  if(P&&inP){const j=Math.floor((price-P.b0)/P.bin), bv=(j>=0&&j<P.v.length)?P.v[j]:0;
+    vpTxt=`<br><span style="color:#57606a">價位 ${price.toFixed(1)}｜VPVR ${+(P.b0+j*P.bin).toFixed(2)}–${+(P.b0+(j+1)*P.bin).toFixed(2)}：${(bv/1e4).toLocaleString('zh-TW',{maximumFractionDigits:0})} 萬股</span>`;}
+  const mac=`<br>${st.sp.y10?`<span style="color:#D97706">10Y ${p.y10!=null?p.y10.toFixed(2)+'%':'—'}</span>`:''}${st.sp.ig?`　<span style="color:#1D7A46">投資級 ${p.ig??'—'} bp</span>`:''}${st.sp.hy?`　<span style="color:#22262B">垃圾級 ${p.hy??'—'} bp</span>`:''}`;
+  const mo=(!MAIN||st.fold.margin)?null:DATA.margin.filter(o=>o.d<=p.d&&o.d<=endD).pop();
+  const oTxt=(MAIN&&!st.fold.oil&&p.wti!=null)?`<br><span style="color:#3B7DD8">WTI ${p.wti.toFixed(2)} 美元</span>`:'';
+  const mgTxt=mo?`<br><span style="color:#2E7D5B">融資年增（${+mo.m.slice(5)}月）${mo.yoy}%</span>`:'';
+  tip.innerHTML=`<b>${p.d}</b>　收盤 ${p.c.toFixed(2)}${maTxt?'<br>'+maTxt:''}${oTxt}${(!MAIN||st.fold.rates)?'':mac}${mgTxt}${vpTxt}`;
+  tip.style.display='block';
+  const bx=box.getBoundingClientRect(); let lx=e.clientX-bx.left+14; if(lx+tip.offsetWidth>bx.width) lx-=tip.offsetWidth+28;
+  tip.style.left=lx+'px'; tip.style.top=(e.clientY-bx.top+14)+'px';
+}
+function hide(){ if(!geo)return; tip.style.display='none'; ['cross','hline','dot'].forEach(k=>geo[k].setAttribute('visibility','hidden')); }
+CHARTS.forEach(C=>{ C.box.addEventListener('mousemove',e=>{use(C);hover(e,C.macro);}); C.box.addEventListener('mouseleave',()=>{use(C);hide();}); });
+window.addEventListener('resize',render);
+render();
+if(location.hash==='#stock') document.querySelector('#pages [data-p=stock]').click();   // 網址加 #stock 直接開個股頁
+</script>
+</body>
+</html>
