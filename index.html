@@ -123,7 +123,7 @@ const ALL = {"ticker": "SOXX", "name": "iShares Semiconductor ETF", "high": "202
 let DATA = ALL;
 const WIN = {wave:'本次', '6m':'半年', '1y':'一年'};
 const MAS = [['ma20','月線20','#f59e0b'],['ma60','季線60','#7c3aed'],['ma120','半年線120','#0d9488'],['ma240','年線240','#db2777']];
-const RANGES = [['6m','6 個月','2026-05-01'],['1y','1 年','2025-11-24']];
+const RANGES = [['3m','3 個月',null],['6m','6 個月','2026-05-01'],['1y','1 年','2025-11-24']];
 const SHADE = ['#64748b','#ef4444','#f59e0b','#22c55e','#3b82f6'];
 const N = DATA.nodes.length;
 // 階段起訖：下跌從 6/22 高點起，其餘從上一段結束日起
@@ -207,7 +207,7 @@ let geo=null;
 const hiLo=(S,a,b)=>{ const w=S.filter(p=>p.d>=a&&p.d<=b); if(!w.length) return null; const hi=w.reduce((x,y)=>y.c>x.c?y:x);
   return [hi, w.filter(p=>p.d>=hi.d).reduce((x,y)=>y.c<x.c?y:x)]; };
 const FIBS=[{k:'q3',lab:'Q3',col:'#57606a',edge:'#c9ced4',txt:'#1f2328',rng:PH=>[PH[0].start,PH[0].end]},
-            {k:'q4',lab:'Q4',col:'#9333ea',edge:'#d8b4fe',txt:'#7e22ce',rng:()=>['2026-11-06','2026-11-20']}];
+            {k:'q4',lab:'Q4',col:'#57606a',edge:'#c9ced4',txt:'#1f2328',rng:()=>['2026-11-06','2026-11-20']}];
 const fibOf=(S,PH)=>Object.fromEntries(FIBS.map(f=>[f.k,hiLo(S,...f.rng(PH))]));
 let FB=fibOf(S,PH);
 const mkPH=D=>D.nodes.map((n,i)=>({...n, start: i? D.nodes[i-1].end : D.high, extra:n.key==='後續'}));
@@ -295,8 +295,8 @@ function renderOne(LEAD,MAIN,C){
     : '尚未開啟任何階段：點上方階段開始回放（會自動連同前面的階段一起開啟）';
   }
 
-  const from=RANGES.find(r=>r[0]===st.range)[2];
   const xEnd = cur&&cur.extra? cur.end : DATA.end;            // x 軸到 10/6；開「後續」才延伸
+  const from=RANGES.find(r=>r[0]===st.range)[2] || (d=>{d.setUTCMonth(d.getUTCMonth()-3); return d.toISOString().slice(0,10);})(new Date(xEnd));   // 3 個月＝x 軸終點往回 3 個月
   const pts=S.filter(p=>p.d>=from&&p.d<=xEnd);
   const cut=pts.filter(p=>p.d<=endD).length;                 // 折線與均線截止
   const W=box.clientWidth-20, H=Math.max(420,Math.min(560,W*0.5));
@@ -329,6 +329,7 @@ function renderOne(LEAD,MAIN,C){
   PH.slice(0,st.open).forEach((ph,i)=>{
     const i0=idx(ph.start), i1=idx(ph.end); if(i0<0||i1<0) return;
     el('rect',{x:x(i0),y:m.t,width:Math.max(2,x(i1)-x(i0)),height:H-m.t-m.b,fill:SHADE[i],'fill-opacity':0.13});
+    if(x(i1)-x(i0)<ph.key.length*13+6) return;              // 時間範圍切到只剩一小截的階段不標名稱
     const t=el('text',{x:(x(i0)+x(i1))/2,y:m.t+14,'text-anchor':'middle','font-size':12,fill:'#57606a','font-weight':500});
     t.textContent=ph.key;
   });
@@ -453,7 +454,7 @@ function renderOne(LEAD,MAIN,C){
   el('line',{x1:m.l,x2:W-m.r,y1:L1,y2:L1,stroke:'#d0d7de'});
   // 原點：低點空心圓（下跌段開啟後才出現）
   FIBS.forEach(f=>{ if(!st.fib[f.k]||!FB[f.k]) return; const FL=FB[f.k][1], li=pts.findIndex(p=>p.d===FL.d);
-    if(li>=0&&li<cut) el('circle',{cx:x(li),cy:y(FL.c),r:5,fill:'#fff',stroke:f.k==='q4'?f.col:'#2563eb','stroke-width':2}); });
+    if(li>=0&&li<cut) el('circle',{cx:x(li),cy:y(FL.c),r:5,fill:'#fff',stroke:'#2563eb','stroke-width':2}); });
   // 折線終點
   const n=cut-1;
   if(n>=0){
@@ -505,7 +506,8 @@ function hover(e,MAIN){
   const mo=(!MAIN||st.fold.margin)?null:DATA.margin.filter(o=>o.d<=p.d&&o.d<=endD).pop();
   const oTxt=(MAIN&&!st.fold.oil&&p.wti!=null)?`<br><span style="color:#3B7DD8">WTI ${p.wti.toFixed(2)} 美元</span>`:'';
   const mgTxt=mo?`<br><span style="color:#2E7D5B">融資年增（${+mo.m.slice(5)}月）${mo.yoy}%</span>`:'';
-  tip.innerHTML=`<b>${p.d}</b>　收盤 ${p.c.toFixed(2)}${maTxt?'<br>'+maTxt:''}${oTxt}${(!MAIN||st.fold.rates)?'':mac}${mgTxt}${vpTxt}`;
+  const fbTxt=FIBS.filter(f=>st.fib[f.k]&&FB[f.k]).map(f=>{const [H,L]=FB[f.k];return `回補水位 ${f.lab}：${((p.c-L.c)/(H.c-L.c)*100).toFixed(1)}%`;}).join('<br>');
+  tip.innerHTML=`<b>${p.d}</b>　收盤 ${p.c.toFixed(2)}${fbTxt?'<br>'+fbTxt:''}${maTxt?'<br>'+maTxt:''}${oTxt}${(!MAIN||st.fold.rates)?'':mac}${mgTxt}${vpTxt}`;
   tip.style.display='block';
   const bx=box.getBoundingClientRect(); let lx=e.clientX-bx.left+14; if(lx+tip.offsetWidth>bx.width) lx-=tip.offsetWidth+28;
   tip.style.left=lx+'px'; tip.style.top=(e.clientY-bx.top+14)+'px';
