@@ -7,7 +7,7 @@ import json, datetime as dt, math, re, calendar
 from collections import defaultdict
 
 HIGH=dt.date(2026,6,22)
-END=dt.date(2026,10,6)   # 第二波結束：均線只畫到這天
+END=dt.date(2026,10,6)   # 反彈2 結束；之後為「後續」段（到最新交易日）
 NODES=[('下跌','2026-07-29','6/22 → 7/29'),
        ('反彈1','2026-08-17','7/29 → 8/17'),
        ('橫盤','2026-09-18','8/17 → 9/18'),
@@ -108,9 +108,8 @@ def build(sym,code,name,tz,auto=False):
                 'v':[round(vol.get(b,0)) for b in range(lo,hi+1)]}
     series=[{'d':a.isoformat(),'c':round(c,4),'ma20':ma(20,i),'ma60':ma(60,i),'ma120':ma(120,i),'ma240':ma(240,i)}
             for i,(a,c,_) in enumerate(daily) if a>=dt.date(2025,11,1)]
-    for r in series:                                    # 10/6 之後（後續）只留收盤價
-        if r['d']>end.isoformat():
-            for k in ('ma20','ma60','ma120','ma240'): r[k]=None
+    last=daily[-1][0]                                   # 第五段「後續」：反彈2 結束 → 最新交易日，同樣有 VPVR／均線
+    nodes=list(nodes)+[('後續',last.isoformat(),f'{end.month}/{end.day} → {last.month}/{last.day}')]
     out={'ticker':code,'name':name,'high':high.isoformat(),'end':end.isoformat(),'series':series,'nodes':[]}
     for k,e,label in nodes:
         e=td(dt.date.fromisoformat(e))
