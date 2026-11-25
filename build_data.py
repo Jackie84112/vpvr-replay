@@ -25,6 +25,8 @@ def back(e,m):
     while mo<=0: mo+=12;y-=1
     return dt.date(y,mo,min(e.day,28))+dt.timedelta(days=1)
 
+BIN_OVERRIDE={'2454':25}   # 手動指定 VPVR 每格（聯發科 10 元太細、柱子剩 1px，使用者 2026-11-25 改 25 元）
+
 def nice_bin(px):   # 價格級距 ≈ 股價 0.5%，取整齊數字（SOXX → 1 美元）
     raw=px*0.005
     return min([0.01,0.02,0.025,0.05,0.1,0.2,0.25,0.5,1,2,2.5,5,10],key=lambda b:abs(math.log(b/raw)))
@@ -92,7 +94,7 @@ def build(sym,code,name,tz,auto=False):
         ends=[ov.get(k,e) for k,e,_ in NODES]
         md=lambda s: f"{int(s[5:7])}/{int(s[8:])}"
         nodes=[(k,ends[i],f"{md(ends[i-1]) if i else '6/22'} → {md(ends[i])}") for i,(k,_,_) in enumerate(NODES)]
-    BIN=nice_bin(dict((a,c) for a,c,_ in daily)[high])
+    BIN=BIN_OVERRIDE.get(code) or nice_bin(dict((a,c) for a,c,_ in daily)[high])
     def profile(s,e):
         vol=defaultdict(float)
         for a,hi,lo,v in hours:
