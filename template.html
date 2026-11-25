@@ -203,13 +203,14 @@ const fmtD=d=>d.slice(5).replace('-','/');
 let geo=null;
 // 回補水位的高低點：6/22 收盤高點、高點到下跌段終點間的最低收盤
 // 每檔各自算：在下跌段（6/22 → 7/29）內找最高收盤（SOXX 即 6/22），低點＝該高點之後到下跌段終點的最低收盤
-// Q4：11/6 → 11/20 區間，同一算法（區間內最高收盤 → 之後到區間終點的最低收盤）
+// Q4：10/6（TSM、2454 用 10/5）→ 11/20 區間，同一算法（區間內最高收盤 → 之後到區間終點的最低收盤）
+const Q4START={TSM:'2026-10-05','2454':'2026-10-05'};
 const hiLo=(S,a,b)=>{ const w=S.filter(p=>p.d>=a&&p.d<=b); if(!w.length) return null; const hi=w.reduce((x,y)=>y.c>x.c?y:x);
   return [hi, w.filter(p=>p.d>=hi.d).reduce((x,y)=>y.c<x.c?y:x)]; };
 const FIBS=[{k:'q3',lab:'Q3',col:'#57606a',edge:'#c9ced4',txt:'#1f2328',rng:PH=>[PH[0].start,PH[0].end]},
-            {k:'q4',lab:'Q4',col:'#57606a',edge:'#c9ced4',txt:'#1f2328',rng:()=>['2026-11-06','2026-11-20']}];
-const fibOf=(S,PH)=>Object.fromEntries(FIBS.map(f=>[f.k,hiLo(S,...f.rng(PH))]));
-let FB=fibOf(S,PH);
+            {k:'q4',lab:'Q4',col:'#57606a',edge:'#c9ced4',txt:'#1f2328',rng:(PH,code)=>[Q4START[code]||'2026-10-06','2026-11-20']}];
+const fibOf=(S,PH,code)=>Object.fromEntries(FIBS.map(f=>[f.k,hiLo(S,...f.rng(PH,code))]));
+let FB=fibOf(S,PH,ALL.ticker);
 const mkPH=D=>D.nodes.map((n,i)=>({...n, start: i? D.nodes[i-1].end : D.high, extra:n.key==='後續'}));
 // 每檔標題顏色（主色, 標題底色）
 const COLORS={SOXX:['#c2410c','#fbf1ec'],'0050':['#1d4ed8','#edf2fd'],QQQ:['#7c3aed','#f4effd'],SPY:['#0f766e','#e8f5f2'],
@@ -229,7 +230,7 @@ paint(document.querySelector('#pg-etf .wrap'),ALL.ticker);
   paint(card,D.ticker);
   document.getElementById('pg-'+pg).appendChild(card);
   const ph=mkPH(D);
-  CHARTS.push({page:pg,lead:!!lead,macro:false,D,PH:ph,S:D.series,FB:fibOf(D.series,ph),svg:card.querySelector('svg'),tip:card.querySelector('.tip'),box:card.querySelector('.chartbox'),
+  CHARTS.push({page:pg,lead:!!lead,macro:false,D,PH:ph,S:D.series,FB:fibOf(D.series,ph,D.ticker),svg:card.querySelector('svg'),tip:card.querySelector('.tip'),box:card.querySelector('.chartbox'),
     last:card.querySelector('.px b'),chg:card.querySelector('.chg'),geo:null,st:mkState(ph),
     tabs:card.querySelector('.tabs'),mas:card.querySelector('.mas'),ranges:card.querySelector('.ranges'),fibs:card.querySelector('.fibs'),info:card.querySelector('.info'),ev:card.querySelector('.evbtn')});
 });
@@ -342,7 +343,7 @@ function renderOne(LEAD,MAIN,C){
       el('rect',{x:m.l,y:yt+0.5,width:vw*v/maxV,height:Math.max(1,yb-yt-1),fill:'#93a8e6','fill-opacity':0.45});
     });
   }
-  // 回補水位：Q3＝下跌段（6/22 高點 → 7/29 低點）、Q4＝11/6–11/20 高點 → 低點；水位 = 低點 + (高點 − 低點) × 比例
+  // 回補水位：Q3＝下跌段（6/22 高點 → 7/29 低點）、Q4＝10/6（TSM、2454 為 10/5）高點 → 11/20 前低點；水位 = 低點 + (高點 − 低點) × 比例
   const FON=FIBS.filter(f=>st.fib[f.k]&&FB[f.k]), two=FON.length>1, LB=[];
   FON.forEach(f=>{ const [FH,FL]=FB[f.k];
     FIB.forEach(([r,lab])=>{
