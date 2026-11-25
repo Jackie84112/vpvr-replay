@@ -62,11 +62,18 @@ def build(sym,code,name,tz,auto=False):
     d=P(f'raw/{sym}_1d.json'); h=P(f'raw/{sym}_1h.json')
     dq=d['indicators']['quote'][0]; hq=h['indicators']['quote'][0]
     day=lambda t: (dt.datetime.utcfromtimestamp(t)+dt.timedelta(hours=tz)).date()
-    daily=[(day(t),dq['close'][i],dq['volume'][i] or 0) for i,t in enumerate(d['timestamp']) if dq['close'][i]]
-    dvol={a:v for a,_,v in daily}
     hours=[(day(t),hq['high'][i],hq['low'][i],hq['volume'][i] or 0) for i,t in enumerate(h['timestamp']) if hq['high'][i]]
-    hsum=defaultdict(float)
+    hsum=defaultdict(float); hlast={}
+    for i,t in enumerate(h['timestamp']):
+        if hq['close'][i]: hlast[day(t)]=hq['close'][i]
     for a,_,_,v in hours: hsum[a]+=v
+    daily=[]
+    for i,t in enumerate(d['timestamp']):
+        a=day(t); c=dq['close'][i]; v=dq['volume'][i] or 0
+        if not c and a<dt.date.today() and a in hlast:   # Yahoo 日線最後一根常是 null → 用小時線補（今天盤中不補）
+            c,v=hlast[a],hsum[a]
+        if c and (not daily or daily[-1][0]!=a): daily.append((a,c,v))
+    dvol={a:v for a,_,v in daily}
     closes=[c for _,c,_ in daily]
     dates=[a for a,_,_ in daily]
     td=lambda x: max(a for a in dates if a<=x)          # 該日（含）以前最後一個交易日
@@ -119,7 +126,9 @@ OV=json.load(open('../總經網站/data/overlay.json',encoding='utf-8'))   # FRE
 OV['wti']=json.load(open('../總經網站/data/rates.json',encoding='utf-8'))['wti']   # Yahoo CL=F，與 rates.html 同源
 def asof(key):
     rows=sorted(OV[key])
+    last=rows[-1][0]
     def f(d):
+        if d>last: return None                          # 資料源還沒出（如利差晚一天）→ 留白，不沿用前值
         v=None
         for dd,x in rows:
             if dd<=d: v=x
