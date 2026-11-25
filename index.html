@@ -232,12 +232,22 @@ const SCEN={
      kp:[[8,375],[14,362],[20,373],[26,361],[32,374],[38,363],[45,368]]},
     {k:'bull',lab:'樂觀',col:'#d1242f',desc:'反彈到 410，之後在 375–410 震盪',band:[375,410],peak:410,
      kp:[[10,410],[16,378],[22,407],[28,376],[34,408],[40,377],[45,395]]},
+  ],
+  // 聯發科：資料最後一天是 11/24 收盤 4050；第 1 天先接 11/25 盤中價 3645（live），收盤資料進來後要把 [1,3645] 與 live 拿掉、其餘關鍵點天數減 1
+  '2454':[
+    {k:'bear',lab:'悲觀',col:'#1a7f37',desc:'跌破 3400（未設下檔目標，路徑僅示意）',bands:[[1,45,null,3400]],live:{j:1,lab:'11/25 盤中'},
+     kp:[[1,3645],[5,3720],[11,3380],[17,3460],[24,3200],[31,3290],[38,3080],[45,3120]]},
+    {k:'base',lab:'中性',col:'#b45309',desc:'反彈到 3700，之後在 3400–3700 震盪',bands:[[1,45,3400,3700]],peak:3700,live:{j:1,lab:'11/25 盤中'},
+     kp:[[1,3645],[6,3700],[12,3440],[18,3680],[24,3420],[30,3690],[36,3430],[45,3560]]},
+    {k:'bull',lab:'樂觀',col:'#d1242f',desc:'反彈到 4000，之後在 3700–4000 震盪',bands:[[1,45,3700,4000]],peak:4000,live:{j:1,lab:'11/25 盤中'},
+     kp:[[1,3645],[9,4000],[15,3730],[21,3980],[27,3720],[33,3990],[39,3740],[45,3880]]},
   ]};
 // 色帶：band＝整段同一區間；bands＝分段 [起始交易日, 結束交易日, 下限, 上限]（null＝無下限/上限）
 const bandsOf=(sc,n)=>sc.bands||[[0,n,...sc.band]];
-const HOL=new Set(['2026-11-26','2026-12-25','2027-01-01','2027-01-18','2027-02-15']);   // 美股休市日
-const futDates=(last,n)=>{ const out=[], d=new Date(last+'T00:00:00Z');
-  while(out.length<n){ d.setUTCDate(d.getUTCDate()+1); const w=d.getUTCDay(), s=d.toISOString().slice(0,10); if(w&&w<6&&!HOL.has(s)) out.push(s); } return out; };
+const HOL={US:new Set(['2026-11-26','2026-12-25','2027-01-01','2027-01-18','2027-02-15']),   // 美股休市日
+           TW:new Set(['2026-12-25','2027-01-01'])};                                          // 台股休市日（行憲紀念日、元旦；農曆年在模擬期間之後）
+const futDates=(last,n,code)=>{ const out=[], d=new Date(last+'T00:00:00Z'), hol=HOL[/^\d/.test(code)?'TW':'US'];
+  while(out.length<n){ d.setUTCDate(d.getUTCDate()+1); const w=d.getUTCDay(), s=d.toISOString().slice(0,10); if(w&&w<6&&!hol.has(s)) out.push(s); } return out; };
 const scPath=(sc,c0)=>{ const k=[[0,c0],...sc.kp], n=k[k.length-1][0], v=[];
   for(let i=0;i<=n;i++){ const j=k.findIndex(q=>q[0]>=i), [a,va]=k[Math.max(0,j-1)], [b,vb]=k[j]; v.push(b===a?vb:va+(vb-va)*(i-a)/(b-a)); } return v; };
 const mkPH=D=>D.nodes.map((n,i)=>({...n, start: i? D.nodes[i-1].end : D.high, extra:n.key==='後續'}));
@@ -332,7 +342,7 @@ function renderOne(LEAD,MAIN,C){
   const cut=pts.filter(p=>p.d<=endD).length;                 // 折線與均線截止
   // 情境：只在開到「後續」時畫，x 軸往右延伸到模擬終點
   const SC=(C&&C.scs&&st.sc&&cur&&cur.extra)? SCEN[DATA.ticker].find(q=>q.k===st.sc) : null;
-  const SP=SC? scPath(SC,pts[pts.length-1].c) : [], FUT=SC? futDates(pts[pts.length-1].d,SP.length-1) : [];
+  const SP=SC? scPath(SC,pts[pts.length-1].c) : [], FUT=SC? futDates(pts[pts.length-1].d,SP.length-1,DATA.ticker) : [];
   const NX=pts.length+FUT.length;
   if(SC) info.innerHTML+=`｜情境：<b style="color:${SC.col}">${SC.lab}</b> ${SC.desc}（示意路徑，非預測）`;
   const W=box.clientWidth-20, H=Math.max(420,Math.min(560,W*0.5));
@@ -413,7 +423,9 @@ function renderOne(LEAD,MAIN,C){
       [b0,b1].forEach(v=>{ if(v==null) return; el('line',{x1:sa,x2:sb,y1:y(v),y2:y(v),stroke:SC.col,'stroke-width':1,'stroke-opacity':0.6});
         const t=el('text',{x:sb-4,y:y(v)+(v===b1?-5:13),'text-anchor':'end','font-size':11,fill:SC.col,'font-weight':500});t.textContent=v; }); });
     el('polyline',{points:SP.map((v,j)=>`${x(i0+j)},${y(v)}`).join(' '),fill:'none',stroke:SC.col,'stroke-width':2,'stroke-dasharray':'6 4','stroke-linejoin':'round'});
-    if(SC.peak){ const j=SP.indexOf(Math.max(...SP)); el('circle',{cx:x(i0+j),cy:y(SP[j]),r:4,fill:'#fff',stroke:SC.col,'stroke-width':2});
+    if(SC.live){ const j=SC.live.j; el('circle',{cx:x(i0+j),cy:y(SP[j]),r:4,fill:'#1f2328',stroke:'#fff','stroke-width':1.5});
+      const t=el('text',{x:x(i0+j)+8,y:y(SP[j])+16,'font-size':11,fill:'#1f2328','font-weight':500});t.textContent=`${SC.live.lab} ${SP[j].toLocaleString()}`; }
+    if(SC.peak){ const j=SC.kp.find(q=>q[1]===SC.peak)[0]; el('circle',{cx:x(i0+j),cy:y(SP[j]),r:4,fill:'#fff',stroke:SC.col,'stroke-width':2});
       const t=el('text',{x:x(i0+j),y:y(SP[j])-10,'text-anchor':'middle','font-size':12,fill:SC.col,'font-weight':700});t.textContent=`反彈 ${SC.peak}`; }
   }
   // x ticks：每個月第一個交易日標「YYYY/M」（含情境的未來日期）
@@ -553,7 +565,7 @@ function hover(e,MAIN){
     hline.setAttribute('visibility','hidden');
     dot.setAttribute('cx',x(i));dot.setAttribute('cy',y(p.c));dot.setAttribute('visibility','visible');
     const fb=FIBS.filter(f=>st.fib[f.k]&&FB[f.k]).map(f=>{const [H,L]=FB[f.k];return `回補水位 ${f.lab}：${((p.c-L.c)/(H.c-L.c)*100).toFixed(1)}%`;}).join('<br>');
-    tip.innerHTML=`<b>${p.d}</b>　<span style="color:${SC.col}">情境（${SC.lab}）模擬 ${p.c.toFixed(2)}</span>${fb?'<br>'+fb:''}<br><span style="color:#8c959f">示意路徑，非預測</span>`;
+    tip.innerHTML=`<b>${p.d}</b>　<span style="color:${SC.col}">${SC.live&&i-pts.length+1===SC.live.j?`${SC.live.lab}價 ${p.c.toFixed(2)}`:`情境（${SC.lab}）模擬 ${p.c.toFixed(2)}`}</span>${fb?'<br>'+fb:''}<br><span style="color:#8c959f">示意路徑，非預測</span>`;
     tip.style.display='block';
     const bx=box.getBoundingClientRect(); let lx=e.clientX-bx.left+14; if(lx+tip.offsetWidth>bx.width) lx-=tip.offsetWidth+28;
     tip.style.left=lx+'px'; tip.style.top=(e.clientY-bx.top+14)+'px'; return;
