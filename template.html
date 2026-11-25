@@ -174,7 +174,7 @@ PH.forEach((n,i)=>{
     `<span class="car"><svg viewBox="0 0 10 10"><path d="M1.5 3.5 5 7l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>`+
     `<span class="menu">`+
       `<div class="hd vprow" data-act="vp"><span class="box"></span>VPVR<small class="cw"></small><span class="arr">›</span>`+
-        `<span class="fly">${Object.entries(WIN).map(([k,v])=>`<div data-w="${k}">${v}<small>${k==='wave'?'6/22 起':''}</small></div>`).join('')}</span></div>`+
+        `<span class="fly">${Object.entries(WIN).map(([k,v])=>`<div data-w="${k}">${v}<small>${k==='wave'?(n.extra?fmtD(n.prof.wave.start):'6/22')+' 起':''}</small></div>`).join('')}</span></div>`+
       `<hr><div class="hd" data-act="ma"><span class="box"></span>均線<small>月／季／半年／年</small></div>`+
     `</span>`;
   // 點名稱：未開→開到這段（含前面）；已開→關掉這段與後面

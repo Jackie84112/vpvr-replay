@@ -55,6 +55,7 @@ def pivots(daily):
     nodes=[(k,seq[i+1][0].isoformat(),f'{md(seq[i][0])} → {md(seq[i+1][0])}') for i,k in enumerate(['下跌','反彈1','橫盤','反彈2'])]
     return H0[0],H2[0],nodes
 
+POST_VP={'TSM':'2026-10-05','2454':'2026-10-05'}   # 「後續」段 VPVR 本次起點（其他段從 6/22 高點起）
 NODE_OVERRIDE={'0050':{'橫盤':'2026-09-15'},'2454':{'橫盤':'2026-09-01'}}   # 代號 → {階段: 結束日}
 
 def build(sym,code,name,tz,auto=False):
@@ -114,7 +115,7 @@ def build(sym,code,name,tz,auto=False):
     for k,e,label in nodes:
         e=td(dt.date.fromisoformat(e))
         out['nodes'].append({'key':k,'label':label,'end':e.isoformat(),
-            'prof':{'wave':profile(high,e),'6m':profile(back(e,6),e),'1y':profile(back(e,12),e)}})
+            'prof':{'wave':profile(td(dt.date.fromisoformat(POST_VP.get(code,'2026-10-06'))) if k=='後續' else high,e),'6m':profile(back(e,6),e),'1y':profile(back(e,12),e)}})
     print(code,'bin',BIN,[(n['key'],n['end']) for n in out['nodes']],'last',series[-1]['d'])
     return out, series
 
