@@ -214,7 +214,7 @@ const FIBS=[{k:'q3',lab:'Q3',col:'#57606a',edge:'#c9ced4',txt:'#1f2328',rng:PH=>
             {k:'q4',lab:'Q4',col:'#57606a',edge:'#c9ced4',txt:'#1f2328',rng:(PH,code)=>[Q4START[code]||'2026-10-06','2026-11-20',true]}];
 const fibOf=(S,PH,code)=>Object.fromEntries(FIBS.map(f=>[f.k,hiLo(S,...f.rng(PH,code))]));
 let FB=fibOf(S,PH,ALL.ticker);
-// ---- 情境模擬（手動設定）：路徑關鍵點 [第幾個交易日, 價格]，第 0 天＝最新收盤；band＝震盪區間（null＝無下限/上限）
+// ---- 情境模擬（手動設定）：路徑關鍵點 [第幾個交易日, 價格]，第 0 天＝最新收盤；band/bands＝震盪區間
 // 只是示意路徑，關鍵點之間直線連接；交易日跳過美股假日
 const SCEN={
   AMD:[
@@ -224,7 +224,17 @@ const SCEN={
      kp:[[8,485],[14,438],[20,458],[26,405],[32,452],[38,410],[45,436]]},
     {k:'bull',lab:'樂觀',col:'#d1242f',desc:'反彈到 520，之後在 460–520 震盪',band:[460,520],peak:520,
      kp:[[10,520],[16,468],[22,512],[28,463],[34,516],[40,466],[45,494]]},
+  ],
+  TSM:[
+    {k:'bear',lab:'悲觀',col:'#1a7f37',desc:'320–360 震盪，之後跌破 320（未設下檔目標，路徑僅示意）',bands:[[0,34,320,360],[34,45,null,320]],
+     kp:[[5,358],[11,325],[17,356],[23,323],[29,352],[34,320],[39,306],[45,296]]},
+    {k:'base',lab:'中性',col:'#b45309',desc:'反彈到 375，之後在 360–375 震盪',band:[360,375],peak:375,
+     kp:[[8,375],[14,362],[20,373],[26,361],[32,374],[38,363],[45,368]]},
+    {k:'bull',lab:'樂觀',col:'#d1242f',desc:'反彈到 410，之後在 375–410 震盪',band:[375,410],peak:410,
+     kp:[[10,410],[16,378],[22,407],[28,376],[34,408],[40,377],[45,395]]},
   ]};
+// 色帶：band＝整段同一區間；bands＝分段 [起始交易日, 結束交易日, 下限, 上限]（null＝無下限/上限）
+const bandsOf=(sc,n)=>sc.bands||[[0,n,...sc.band]];
 const HOL=new Set(['2026-11-26','2026-12-25','2027-01-01','2027-01-18','2027-02-15']);   // 美股休市日
 const futDates=(last,n)=>{ const out=[], d=new Date(last+'T00:00:00Z');
   while(out.length<n){ d.setUTCDate(d.getUTCDate()+1); const w=d.getUTCDay(), s=d.toISOString().slice(0,10); if(w&&w<6&&!HOL.has(s)) out.push(s); } return out; };
@@ -340,7 +350,7 @@ function renderOne(LEAD,MAIN,C){
   if(showMA) pts.forEach(p=>MAS.forEach(([k])=>{if(st.maShow.has(k)&&p[k]!=null)vals.push(p[k]);}));
   if(P){vals.push(P.b0, P.b0+P.v.length*P.bin);}
   FIBS.forEach(f=>{ if(st.fib[f.k]&&FB[f.k]) vals.push(FB[f.k][0].c, FB[f.k][1].c); });
-  if(SC){ vals.push(...SP); SC.band.forEach(v=>{ if(v!=null) vals.push(v); }); }
+  if(SC){ vals.push(...SP); bandsOf(SC,SP.length-1).forEach(([,,a,b])=>[a,b].forEach(v=>{ if(v!=null) vals.push(v); })); }
   let lo=Math.min(...vals), hi=Math.max(...vals);
   const pad=(hi-lo)*0.03; lo-=pad; hi+=pad;
   const x=i=>m.l+(W-m.l-m.r)*i/(NX-1);
@@ -397,10 +407,11 @@ function renderOne(LEAD,MAIN,C){
     const i0=pts.length-1, xa=x(i0), xb=x(NX-1), yb0=H-m.b;
     el('rect',{x:xa,y:m.t,width:xb-xa,height:yb0-m.t,fill:'#f3f4f6','fill-opacity':0.7});
     const ft=el('text',{x:(xa+xb)/2,y:m.t+14,'text-anchor':'middle','font-size':12,fill:'#57606a','font-weight':500});ft.textContent='情境模擬';
-    const [b0,b1]=SC.band, yTop=b1!=null? y(b1) : m.t, yBot=b0!=null? y(b0) : yb0;
-    el('rect',{x:xa,y:yTop,width:xb-xa,height:Math.max(1,yBot-yTop),fill:SC.col,'fill-opacity':0.10});
-    [b0,b1].forEach(v=>{ if(v==null) return; el('line',{x1:xa,x2:xb,y1:y(v),y2:y(v),stroke:SC.col,'stroke-width':1,'stroke-opacity':0.6});
-      const t=el('text',{x:xb-4,y:y(v)+(v===b1?-5:13),'text-anchor':'end','font-size':11,fill:SC.col,'font-weight':500});t.textContent=v; });
+    bandsOf(SC,SP.length-1).forEach(([d0,d1,b0,b1])=>{
+      const sa=x(i0+d0), sb=x(i0+d1), yTop=b1!=null? y(b1) : m.t, yBot=b0!=null? y(b0) : yb0;
+      el('rect',{x:sa,y:yTop,width:sb-sa,height:Math.max(1,yBot-yTop),fill:SC.col,'fill-opacity':0.10});
+      [b0,b1].forEach(v=>{ if(v==null) return; el('line',{x1:sa,x2:sb,y1:y(v),y2:y(v),stroke:SC.col,'stroke-width':1,'stroke-opacity':0.6});
+        const t=el('text',{x:sb-4,y:y(v)+(v===b1?-5:13),'text-anchor':'end','font-size':11,fill:SC.col,'font-weight':500});t.textContent=v; }); });
     el('polyline',{points:SP.map((v,j)=>`${x(i0+j)},${y(v)}`).join(' '),fill:'none',stroke:SC.col,'stroke-width':2,'stroke-dasharray':'6 4','stroke-linejoin':'round'});
     if(SC.peak){ const j=SP.indexOf(Math.max(...SP)); el('circle',{cx:x(i0+j),cy:y(SP[j]),r:4,fill:'#fff',stroke:SC.col,'stroke-width':2});
       const t=el('text',{x:x(i0+j),y:y(SP[j])-10,'text-anchor':'middle','font-size':12,fill:SC.col,'font-weight':700});t.textContent=`反彈 ${SC.peak}`; }
