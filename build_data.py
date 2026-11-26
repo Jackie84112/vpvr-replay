@@ -138,8 +138,16 @@ def build(sym,code,name,tz,auto=False):
         lo,hi=min(vol),max(vol)
         return {'start':s.isoformat(),'end':e.isoformat(),'bin':BIN,'b0':round(lo*BIN,6),
                 'v':[round(vol.get(b,0)) for b in range(lo,hi+1)]}
-    series=[{'d':a.isoformat(),'c':round(c,4),'ma20':ma(20,i),'ma60':ma(60,i),'ma120':ma(120,i),'ma240':ma(240,i)}
-            for i,(a,c,_) in enumerate(daily) if a>=dt.date(2025,11,1)]
+    # MACD(12,26,9)：用全部日線算 EMA，DIF＝EMA12−EMA26、DEA＝DIF 的 EMA9、柱＝DIF−DEA（2026-11-26 加副圖）
+    e12=e26=dea=None; MC=[]
+    for c in closes:
+        e12=c if e12 is None else e12+(c-e12)*2/13
+        e26=c if e26 is None else e26+(c-e26)*2/27
+        dif=e12-e26; dea=dif if dea is None else dea+(dif-dea)*2/10
+        MC.append((dif,dea,dif-dea))
+    series=[{'d':a.isoformat(),'c':round(c,4),'ma20':ma(20,i),'ma60':ma(60,i),'ma120':ma(120,i),'ma240':ma(240,i),
+             'v':round(v),'dif':round(MC[i][0],2),'dea':round(MC[i][1],2),'hist':round(MC[i][2],2)}
+            for i,(a,c,v) in enumerate(daily) if a>=dt.date(2025,11,1)]
     last=daily[-1][0]                                   # 第五段「後續」：反彈2 結束 → 最新交易日，同樣有 VPVR／均線
     nodes=list(nodes)+[('後續',last.isoformat(),f'{end.month}/{end.day} → {last.month}/{last.day}')]
     out={'ticker':code,'name':name,'high':high.isoformat(),'end':end.isoformat(),'series':series,'nodes':[]}
