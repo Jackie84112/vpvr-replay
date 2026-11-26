@@ -513,22 +513,33 @@ function renderOne(LEAD,MAIN,C){
       const a=el('text',{x:W-m.r+8,y:yV(v*VU.d)+4,'font-size':11,fill:'#8c959f'});a.textContent=(+v.toFixed(2)).toLocaleString(); }
     shade(VL,Hv);
     pts.slice(0,cut).forEach((p,i)=>{ if(!p.v) return; const up=p.pc==null||p.c>=p.pc;
-      el('rect',{x:x(i)-bw/2,y:yV(p.v),width:bw,height:Math.max(0.5,VL+Hv-yV(p.v)),fill:up?'#d1242f':'#1a7f37','fill-opacity':0.75}); });
-    el('line',{x1:m.l,x2:W-m.r,y1:VL+Hv,y2:VL+Hv,stroke:'#e5e7eb'});
+      el('rect',{x:x(i)-bw/2,y:yV(p.v),width:bw,height:Math.max(0.5,VL+Hv-yV(p.v)),rx:1.5,fill:up?'#DC2626':'#15803D',opacity:0.55}); });
+    el('line',{x1:m.l,x2:W-m.r,y1:VL+Hv,y2:VL+Hv,stroke:'#8C9096'});
   }
   // ---- MACD(12,26,9)
-  subTitle('macd',D0,`<tspan fill="#1f2328">MACD</tspan><tspan dx="8" fill="#8c959f" font-size="11">(12, 26, 9)｜</tspan><tspan fill="#2563eb" font-size="11">DIF</tspan><tspan dx="6" fill="#D97706" font-size="11">DEA</tspan><tspan dx="6" fill="#8c959f" font-size="11">柱＝DIF−DEA</tspan>`);
+  subTitle('macd',D0,`<tspan fill="#1f2328">MACD</tspan><tspan dx="8" fill="#8c959f" font-size="11">(12, 26, 9)｜</tspan><tspan fill="#2563EB" font-size="11">MACD 線</tspan><tspan dx="6" fill="#D97706" font-size="11">信號線</tspan><tspan dx="6" fill="#8c959f" font-size="11">柱：紅正綠負｜〇 紅＝黃金交叉、綠＝死亡交叉</tspan>`);
   if(!st.fold.macd){
-    const mv=pts.flatMap(p=>[p.dif,p.dea,p.hist]).filter(v=>v!=null), ma=Math.max(1e-9,...mv.map(Math.abs))*1.08;
-    const yD=v=>DL+Hd*(ma-v)/(2*ma);
-    const ds=niceStep(ma,2);
-    for(let v=-Math.floor(ma/ds)*ds; v<=ma; v+=ds){ el('line',{x1:m.l,x2:W-m.r,y1:yD(v),y2:yD(v),stroke:Math.abs(v)<1e-9?'#c9ced4':'#eef0f2'});
-      const a=el('text',{x:W-m.r+8,y:yD(v)+4,'font-size':11,fill:'#8c959f'});a.textContent=+v.toFixed(4); }
+    // 縱軸只涵蓋實際數值（含 0），不對稱於 0；柱、線共用同一把尺（同大盤監控 retrace.js）
+    const mv=pts.flatMap(p=>[p.dif,p.dea,p.hist]).filter(v=>v!=null).concat(0), mn=Math.min(...mv), mx=Math.max(...mv), pd=(mx-mn)*0.14||1;
+    const lo2=mn-pd, hi2=mx+pd, yD=v=>DL+Hd*(hi2-v)/(hi2-lo2), mid=yD(0), dec=Math.abs(mx-mn)<10?2:1;
     shade(DL,Hd);
-    pts.slice(0,cut).forEach((p,i)=>{ if(p.hist==null) return; const y0=yD(0), y1=yD(p.hist);
-      el('rect',{x:x(i)-bw/2,y:Math.min(y0,y1),width:bw,height:Math.max(0.5,Math.abs(y1-y0)),fill:p.hist>=0?'#d1242f':'#1a7f37','fill-opacity':0.6}); });
-    [['dif','#2563eb'],['dea','#D97706']].forEach(([k,c])=>el('polyline',{points:pts.slice(0,cut).map((p,i)=>p[k]==null?null:`${x(i)},${yD(p[k])}`).filter(Boolean).join(' '),fill:'none',stroke:c,'stroke-width':1.4,'stroke-linejoin':'round'}));
-    el('line',{x1:m.l,x2:W-m.r,y1:DL+Hd,y2:DL+Hd,stroke:'#e5e7eb'});
+    el('line',{x1:m.l,x2:m.l,y1:DL,y2:DL+Hd,stroke:'#8C9096'});
+    el('line',{x1:m.l,x2:W-m.r,y1:mid,y2:mid,stroke:'#8C9096'});
+    const tx=(xx,yy,t,c,a)=>{const e=el('text',{x:xx,y:yy,'font-size':10.5,fill:c,'text-anchor':a||'start'});e.textContent=t;return e;};
+    tx(W-m.r+6,mid+3.5,'0','#9AA0A6');
+    tx(m.l-6,yD(mx)+3.5,mx.toFixed(dec),'#9AA0A6','end'); tx(m.l-6,yD(mn)+3.5,mn.toFixed(dec),'#9AA0A6','end');
+    const vis=pts.slice(0,cut);
+    vis.forEach((p,i)=>{ if(p.hist==null) return; const yy=yD(p.hist), up=p.hist>=0;
+      el('rect',{x:x(i)-bw/2,y:up?yy:mid,width:bw,height:Math.max(1,Math.abs(yy-mid)),rx:1.5,fill:up?'#DC2626':'#15803D',opacity:0.5}); });
+    [['dif','#2563EB'],['dea','#F59E0B']].forEach(([k,c])=>el('polyline',{points:vis.map((p,i)=>p[k]==null?null:`${x(i)},${yD(p[k])}`).filter(Boolean).join(' '),fill:'none',stroke:c,'stroke-width':2.2,'stroke-linejoin':'round'}));
+    // 交叉：柱由負轉正＝黃金交叉（紅圈）、由正轉負＝死亡交叉（綠圈），圈在兩線交點
+    vis.forEach((p,i)=>{ const q=vis[i-1]; if(!i||p.hist==null||q.hist==null||(p.hist>=0)===(q.hist>=0)) return;
+      const r=Math.abs(q.hist)/(Math.abs(q.hist)+Math.abs(p.hist)), px=x(i-1)+(x(i)-x(i-1))*r, cy=yD(q.dif+(p.dif-q.dif)*r);
+      el('circle',{cx:px,cy,r:5,fill:'none',stroke:p.hist>=0?'#DC2626':'#15803D','stroke-width':2}); });
+    const L=vis[vis.length-1];
+    if(L&&L.dif!=null){ const yl=yD(L.dif), ys=yD(L.dea), near=Math.abs(yl-ys)<13, ab=L.dif>L.dea;
+      tx(W-m.r+6,yl+(near?(ab?-4:12):3.5),`MACD　${L.dif.toFixed(2)}`,'#2563EB');
+      tx(W-m.r+6,ys+(near?(ab?12:-4):3.5),`信號　${L.dea.toFixed(2)}`,'#D97706'); }
   }
   if(MAIN){
   // ---- 副圖 O：WTI 原油價格（美元／桶，右軸；總經網站 rates.json，Yahoo CL=F 近月期貨）
@@ -673,7 +684,7 @@ function hover(e,MAIN){
   const mgTxt=mo?`<br><span style="color:#2E7D5B">融資年增（${+mo.m.slice(5)}月）${mo.yoy}%</span>`:'';
   const fbTxt=FIBS.filter(f=>st.fib[f.k]&&FB[f.k]).map(f=>{const [H,L]=FB[f.k];return `回補水位 ${f.lab}：${((p.c-L.c)/(H.c-L.c)*100).toFixed(1)}%`;}).join('<br>');
   const vTxt=(!st.fold.vol&&p.v)?`<br>成交量 ${(p.v/VU.d).toLocaleString('zh-TW',{maximumFractionDigits:0})} ${VU.lab}`:'';
-  const dTxt=(!st.fold.macd&&p.dif!=null)?`<br><span style="color:#2563eb">DIF ${p.dif.toFixed(2)}</span>　<span style="color:#D97706">DEA ${p.dea.toFixed(2)}</span>　<span style="color:${p.hist>=0?'#d1242f':'#1a7f37'}">柱 ${p.hist.toFixed(2)}</span>`:'';
+  const dTxt=(!st.fold.macd&&p.dif!=null)?`<br><span style="color:#2563EB">MACD ${p.dif.toFixed(2)}</span>　<span style="color:#D97706">信號 ${p.dea.toFixed(2)}</span>　<span style="color:${p.hist>=0?'#DC2626':'#15803D'}">柱 ${p.hist.toFixed(2)}</span>`:'';
   tip.innerHTML=`<b>${p.d}</b>　收盤 ${p.c.toFixed(2)}${fbTxt?'<br>'+fbTxt:''}${maTxt?'<br>'+maTxt:''}${vTxt}${dTxt}${oTxt}${(!MAIN||st.fold.rates)?'':mac}${mgTxt}${vpTxt}`;
   tip.style.display='block';
   const bx=box.getBoundingClientRect(); let lx=e.clientX-bx.left+14; if(lx+tip.offsetWidth>bx.width) lx-=tip.offsetWidth+28;
