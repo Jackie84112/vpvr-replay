@@ -3,7 +3,7 @@ r"""分段 VPVR 回放：raw\<代號>_1d/_1h.json → data.json
 VPVR：小時 K 的量平均攤在該根高低價之間；每日小時量依日線總量等比放大（補收盤競價）。
 所有 VP 起點＝6/22；半年/一年＝終點往回 6/12 個月。只用終點當天(含)以前資料。
 各檔的階段日期取「該市場在該日（含）以前的最後一個交易日」（0050 遇台股休市會往前取）。"""
-import json, datetime as dt, math, re, calendar
+import json, datetime as dt, math, re, calendar, requests
 from collections import defaultdict
 
 HIGH=dt.date(2026,6,22)
@@ -60,6 +60,29 @@ def pivots(daily):
 POST_VP={'TSM':'2026-10-05','2454':'2026-10-05'}   # 「後續」段 VPVR 本次起點（其他段從 6/22 高點起）
 NODE_OVERRIDE={'0050':{'橫盤':'2026-09-15'},'2454':{'橫盤':'2026-09-01'}}   # 代號 → {階段: 結束日}
 
+def twse_live(sym):
+    """台股最新一根用證交所即時報價（盤中＝即時價、收盤後＝官方收盤）；Yahoo 台股晚 15–20 分（2026-11-26 使用者要「即時數據」）"""
+    if not sym.endswith('.TW'): return None
+    try:
+        a=requests.get('https://mis.twse.com.tw/stock/api/getStockInfo.jsp',params={'ex_ch':f"tse_{sym[:-3]}.tw",'json':'1','delay':'0'},
+                       headers={'User-Agent':'Mozilla/5.0'},timeout=20).json()['msgArray'][0]
+        px=next(v for v in (a.get('z'),a.get('pz'),(a.get('b') or '').split('_')[0]) if v and v!='-')
+        return dt.date(int(a['d'][:4]),int(a['d'][4:6]),int(a['d'][6:])),float(px),float(a['v'])*1000
+    except Exception: return None
+
+def twse_month(sym):
+    """證交所 STOCK_DAY 本月官方收盤/量 {date:(c,v)}；Yahoo 台股常漏 13:30 收盤集合競價（0050 11/25 Yahoo 90.1 vs 官方 90.3）"""
+    if not sym.endswith('.TW'): return {}
+    try:
+        j=requests.get('https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY',params={'date':dt.date.today().strftime('%Y%m01'),'stockNo':sym[:-3],'response':'json'},
+                       headers={'User-Agent':'Mozilla/5.0'},timeout=20).json()
+        f=lambda x: float(x.replace(',',''))
+        out={}
+        for r in j.get('data') or []:
+            y,m,d=r[0].split('/'); out[dt.date(int(y)+1911,int(m),int(d))]=(f(r[6]),f(r[1]))
+        return out
+    except Exception: return {}
+
 def build(sym,code,name,tz,auto=False):
     P=lambda f: json.load(open(f))['chart']['result'][0]
     d=P(f'raw/{sym}_1d.json'); h=P(f'raw/{sym}_1h.json')
@@ -76,6 +99,12 @@ def build(sym,code,name,tz,auto=False):
         if not c and a<dt.date.today() and a in hlast:   # Yahoo 日線最後一根常是 null → 用小時線補（今天盤中不補）
             c,v=hlast[a],hsum[a]
         if c and (not daily or daily[-1][0]!=a): daily.append((a,c,v))
+    off=twse_month(sym)
+    daily=[(a,*off[a]) if a in off else (a,c,v) for a,c,v in daily]
+    tw=twse_live(sym)
+    if tw and daily and tw[0]>=daily[-1][0]:
+        if tw[0]==daily[-1][0]: daily[-1]=tw
+        else: daily.append(tw)
     dvol={a:v for a,_,v in daily}
     closes=[c for _,c,_ in daily]
     dates=[a for a,_,_ in daily]
