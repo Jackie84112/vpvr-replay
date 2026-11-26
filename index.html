@@ -136,7 +136,7 @@ const N = DATA.nodes.length;
 let PH = DATA.nodes.map((n,i)=>({...n, start: i? DATA.nodes[i-1].end : DATA.high, extra:n.key==='後續'}));
 // open = 開啟到第幾段（連續回放，0 = 全關）；每段各自的 VPVR / 均線設定
 // 預設：全部階段開到「後續」、VPVR 本次、回補水位只開 Q4、情境中性、時間 6 個月
-const mkState=PH=>({open:PH.length, ev:false, jh:true, fib:{q3:false,q4:true}, sc:'base', vp:PH.map(()=>'wave'), ma:PH.map(()=>false), maShow:new Set(MAS.map(m=>m[0])), sp:{y10:true,hy:true,ig:true}, fold:{vol:false,macd:false,oil:false,rates:false,margin:false}, range:'6m'});
+const mkState=PH=>({open:PH.length, ev:false, jh:true, fib:{q3:false,q4:true}, sc:'base', vp:PH.map(()=>'wave'), ma:PH.map(()=>false), maShow:new Set(MAS.map(m=>m[0])), sp:{y10:true,hy:true,ig:true}, fold:{vol:true,macd:true,oil:false,rates:false,margin:false}, range:'6m'});
 let st = mkState(PH);
 
 let S = DATA.series;
