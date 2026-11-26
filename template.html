@@ -610,7 +610,6 @@ function hover(e,MAIN){
   const inP=sy<=H-m.b;
   const iRaw=Math.round((sx-m.l)/(W-m.l-m.r)*(NX-1)), fut=SC&&iRaw>=pts.length;
   const i=fut? Math.min(NX-1,iRaw) : Math.min(cut-1,iRaw), p=fut? {d:FUT[i-pts.length+1-1],c:SP[i-pts.length+1]} : pts[i];
-  const price=hi-(sy-m.t)/(H-m.t-m.b)*(hi-lo);
   if(fut){
     cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');
     hline.setAttribute('visibility','hidden');
@@ -622,12 +621,13 @@ function hover(e,MAIN){
     tip.style.left=lx+'px'; tip.style.top=(e.clientY-bx.top+14)+'px'; return;
   }
   cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('visibility','visible');
-  hline.setAttribute('y1',sy);hline.setAttribute('y2',sy);hline.setAttribute('visibility',inP?'visible':'hidden');
+  // 浮標一律吸附當天收盤（2026-11-26 使用者要求：滑鼠在圖上任何高度都顯示該日收盤，不跟游標價位）
+  const yc=y(p.c); hline.setAttribute('y1',yc);hline.setAttribute('y2',yc);hline.setAttribute('visibility',inP?'visible':'hidden');
   dot.setAttribute('cx',x(i));dot.setAttribute('cy',y(p.c));dot.setAttribute('visibility','visible');
   const maTxt=showMA?MAS.filter(([k])=>st.maShow.has(k)&&p[k]!=null).map(([k,l])=>`${l}：${p[k].toFixed(2)}`).join('<br>'):'';
   let vpTxt='';
-  if(P&&inP){const j=Math.floor((price-P.b0)/P.bin), bv=(j>=0&&j<P.v.length)?P.v[j]:0;
-    vpTxt=`<br><span style="color:#57606a">價位 ${price.toFixed(1)}｜VPVR ${+(P.b0+j*P.bin).toFixed(2)}–${+(P.b0+(j+1)*P.bin).toFixed(2)}：${(bv/1e4).toLocaleString('zh-TW',{maximumFractionDigits:0})} 萬股</span>`;}
+  if(P&&inP){const j=Math.floor((p.c-P.b0)/P.bin), bv=(j>=0&&j<P.v.length)?P.v[j]:0;
+    vpTxt=`<br><span style="color:#57606a">收盤所在 VPVR ${+(P.b0+j*P.bin).toFixed(2)}–${+(P.b0+(j+1)*P.bin).toFixed(2)}：${(bv/1e4).toLocaleString('zh-TW',{maximumFractionDigits:0})} 萬股</span>`;}
   const mac=`<br>${st.sp.y10?`<span style="color:#D97706">10Y ${p.y10!=null?p.y10.toFixed(2)+'%':'—'}</span>`:''}${st.sp.ig?`　<span style="color:#1D7A46">投資級 ${p.ig??'—'} bp</span>`:''}${st.sp.hy?`　<span style="color:#22262B">垃圾級 ${p.hy??'—'} bp</span>`:''}`;
   const mo=(!MAIN||st.fold.margin)?null:DATA.margin.filter(o=>o.d<=p.d&&o.d<=endD).pop();
   const oTxt=(MAIN&&!st.fold.oil&&p.wti!=null)?`<br><span style="color:#3B7DD8">WTI ${p.wti.toFixed(2)} 美元</span>`:'';
